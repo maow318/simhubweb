@@ -5,21 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>初始化 · SIMHUB Web</title>
 <style>
-:root{--bg:#f2f2f7;--card:#fff;--text:#1c1c1e;--sub:#8e8e93;--line:#e5e5ea;--accent:#0a84ff;--danger:#ff3b30;--ok:#34c759;--shadow:0 8px 24px rgba(0,0,0,.06)}
-@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f2f2f7;--sub:#8e8e93;--line:#2c2c2e;--shadow:none}}
+:root{--bg:#f2f2f7;--card:#fff;--text:#1d1d1f;--sub:#86868b;--line:#e5e5ea;--accent:#0a84ff;--accent-weak:rgba(10,132,255,.12);--danger:#ff3b30;--ok:#34c759;--shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);--ring:0 0 0 4px var(--accent-weak);--t:.18s cubic-bezier(.4,0,.2,1)}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--sub:#98989d;--line:#2c2c2e;--accent-weak:rgba(10,132,255,.22);--shadow:0 1px 2px rgba(0,0,0,.5)}}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);color:var(--text);letter-spacing:-.011em;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 .loginCard{background:var(--card);border-radius:24px;box-shadow:var(--shadow);padding:34px 28px;width:100%;max-width:380px}
 .logo{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#0a84ff,#5ac8fa);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#fff;font-size:30px;font-weight:700}
-h1{font-size:22px;margin:0 0 4px;text-align:center}
+h1{font-size:22px;margin:0 0 4px;text-align:center;font-weight:700;letter-spacing:-.02em}
 .subtitle{color:var(--sub);font-size:13px;text-align:center;margin:0 0 22px;line-height:1.5}
 .field{margin-bottom:13px}
 .field label{display:block;font-size:13px;color:var(--sub);margin-bottom:5px}
-input{font:inherit;width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--text);outline:none}
-input:focus{border-color:var(--accent)}
-button{font:inherit;width:100%;margin-top:8px;cursor:pointer;border:none;border-radius:12px;padding:12px;background:var(--accent);color:#fff;font-weight:600;font-size:15px}
-button:active{opacity:.85}
+input{font:inherit;width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--text);outline:none;transition:border-color var(--t),box-shadow var(--t)}
+input:focus{border-color:var(--accent);box-shadow:var(--ring)}
+button{font:inherit;width:100%;margin-top:8px;cursor:pointer;border:none;border-radius:12px;padding:12px;background:var(--accent);color:#fff;font-weight:600;font-size:15px;letter-spacing:-.01em;transition:filter var(--t),transform var(--t),box-shadow var(--t)}
+button:hover{filter:brightness(1.06)}
+button:focus-visible{outline:none;box-shadow:var(--ring)}
+button:active{transform:scale(.98)}
 .flash{font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:13px}
 .flash.error{background:rgba(255,59,48,.14);color:var(--danger)}
 .flash.success{background:rgba(52,199,89,.16);color:var(--ok)}
