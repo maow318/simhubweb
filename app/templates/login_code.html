@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>邮箱验证码 · SIMHUB Web</title>
+<style>
+:root{--bg:#f2f2f7;--card:#fff;--text:#1c1c1e;--sub:#8e8e93;--line:#e5e5ea;--accent:#0a84ff;--danger:#ff3b30;--ok:#34c759;--shadow:0 8px 24px rgba(0,0,0,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f2f2f7;--sub:#8e8e93;--line:#2c2c2e;--shadow:none}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.loginCard{background:var(--card);border-radius:24px;box-shadow:var(--shadow);padding:34px 28px;width:100%;max-width:380px}
+.logo{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#0a84ff,#5ac8fa);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#fff;font-size:30px;font-weight:700}
+h1{font-size:22px;margin:0 0 4px;text-align:center}
+.subtitle{color:var(--sub);font-size:13px;text-align:center;margin:0 0 22px;line-height:1.5}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:13px;color:var(--sub);margin-bottom:5px}
+input{font:inherit;width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--text);outline:none}
+.codeInput{letter-spacing:8px;text-align:center;font-size:22px;font-weight:700}
+input:focus{border-color:var(--accent)}
+button{font:inherit;width:100%;margin-top:8px;cursor:pointer;border:none;border-radius:12px;padding:12px;background:var(--accent);color:#fff;font-weight:600;font-size:15px}
+button:active{opacity:.85}
+.altlink{display:block;text-align:center;margin-top:14px;font-size:13px;color:var(--sub);text-decoration:none}
+.flash{font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:13px}
+.flash.error{background:rgba(255,59,48,.14);color:var(--danger)}
+.flash.success{background:rgba(52,199,89,.16);color:var(--ok)}
+</style>
+</head>
+<body>
+<form class="loginCard" method="post">
+  <div class="logo">S</div>
+  <h1>邮箱验证</h1>
+  <p class="subtitle">验证码已发送到 {{ email }}，5 分钟内有效。</p>
+  <div id="flashHost"></div>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="field">
+    <label>邮箱验证码</label>
+    <input name="code" class="codeInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required autofocus placeholder="000000">
+  </div>
+  <button type="submit">验证并登录</button>
+  <a class="altlink" href="{{ url_for('login') }}">返回重新登录</a>
+</form>
+<script>
+const FLASHES=[{% for category, message in get_flashed_messages(with_categories=true) %}["{{ category }}",{{ message|tojson }}],{% endfor %}];
+const host=document.getElementById("flashHost");
+FLASHES.forEach(([c,m])=>{const d=document.createElement("div");d.className="flash "+c;d.textContent=m;host.appendChild(d);});
+</script>
+</body>
+</html>

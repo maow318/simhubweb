@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}卡片管理 - SIMHUB Web{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">SIMHUB 独立端</p>
+    <h1>和 iOS App 内置 Web 使用同一套卡片字段。</h1>
+  </div>
+  <a class="primary-action" href="{{ url_for('new_card') }}">添加卡片</a>
+</section>
+
+<section class="stats-grid">
+  <article>
+    <span>卡片总数</span>
+    <strong>{{ stats.total }}</strong>
+  </article>
+  <article class="danger">
+    <span>已过期</span>
+    <strong>{{ stats.overdue }}</strong>
+  </article>
+  <article class="warning">
+    <span>7 天内</span>
+    <strong>{{ stats.urgent }}</strong>
+  </article>
+  <article>
+    <span>长期保号</span>
+    <strong>{{ stats.long }}</strong>
+  </article>
+  <article>
+    <span>国家/地区</span>
+    <strong>{{ stats.countries }}</strong>
+  </article>
+</section>
+
+<form class="filters" method="get">
+  <input name="q" value="{{ filters.q }}" placeholder="搜索运营商、套餐、号码、EID、SM-DP+">
+  <select name="country">
+    <option value="" {% if not filters.country %}selected{% endif %}>全部国家/地区</option>
+    {% for country in countries %}
+      <option value="{{ country }}" {% if filters.country == country %}selected{% endif %}>{{ country }}</option>
+    {% endfor %}
+  </select>
+  <select name="due">
+    <option value="" {% if not filters.due %}selected{% endif %}>全部日期</option>
+    <option value="overdue" {% if filters.due == "overdue" %}selected{% endif %}>已过期</option>
+    <option value="urgent" {% if filters.due == "urgent" %}selected{% endif %}>7 天内</option>
+    <option value="soon" {% if filters.due == "soon" %}selected{% endif %}>30 天内</option>
+    <option value="long" {% if filters.due == "long" %}selected{% endif %}>长期保号</option>
+  </select>
+  <button type="submit">筛选</button>
+</form>
+
+{% if tags %}
+  <div class="tag-row">
+    {% for tag in tags %}
+      <a class="tag {% if filters.tag == tag %}active{% endif %}" href="{{ url_for('dashboard', tag=tag) }}">{{ tag }}</a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if cards %}
+  <section class="sim-list">
+    {% for card in cards %}
+      {% set badge = due_badge(card) %}
+      <article class="sim-card {{ badge.key }}">
+        <div class="sim-main">
+          <div>
+            <div class="sim-title-row">
+              {% if card.carrierAppIconURLString %}
+                <img class="carrier-icon" src="{{ card.carrierAppIconURLString }}" alt="">
+              {% else %}
+                <span class="flag-icon">{{ card.flag or "🌐" }}</span>
+              {% endif %}
+              <h2>{{ card.carrier or "未命名运营商" }}</h2>
+              <span class="badge {{ badge.key }}">{{ badge.label }}</span>
+            </div>
+            <p class="muted">
+              {{ card.plan or "未填套餐" }}
+              {% if card.countryName %} · {{ card.countryName }}{% endif %}
+              {% if card.phoneNumber %} · {{ card.phoneNumber }}{% endif %}
+            </p>
+          </div>
+          <div class="sim-cost">
+            <span>{{ card.currencyCode or "" }}</span>
+            <strong>{{ card.price or "—" }}</strong>
+            <small>周期费用</small>
+          </div>
+        </div>
+
+        <dl class="sim-meta">
+          <div>
+            <dt>开始日期</dt>
+            <dd>{{ date_input(card.activationDate) or "未设置" }}</dd>
+          </div>
+          <div>
+            <dt>到期日期</dt>
+            <dd>{{ date_input(card.expiryDate) or "未设置" }}</dd>
+          </div>
+          <div>
+            <dt>续期周期</dt>
+            <dd>{{ card.renewDays or 30 }} 天</dd>
+          </div>
+          <div>
+            <dt>余额</dt>
+            <dd>{{ card.currentBalance or "未填" }}</dd>
+          </div>
+        </dl>
+
+        {% if card.tags %}
+          <div class="tag-row compact">
+            {% for tag in card.tags %}
+              <span class="tag">{{ tag }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if card.transactionNotes or card.customPrompt %}
+          <p class="notes">{{ card.transactionNotes or card.customPrompt }}</p>
+        {% endif %}
+
+        <div class="card-actions">
+          <form method="post" action="{{ url_for('renew_card', card_id=card.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit">完成续期</button>
+          </form>
+          <a class="secondary-action" href="{{ url_for('edit_card', card_id=card.id) }}">编辑</a>
+          <form method="post" action="{{ url_for('delete_card_route', card_id=card.id) }}" onsubmit="return confirm('确定删除这张卡片吗？')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="danger-button" type="submit">删除</button>
+          </form>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% else %}
+  <section class="empty-state">
+    <h2>还没有卡片</h2>
+    <p>添加第一张 eSIM/SIM 卡片后，这里会显示 App 同款字段、到期提醒和导入导出。</p>
+    <a class="primary-action" href="{{ url_for('new_card') }}">添加卡片</a>
+  </section>
+{% endif %}
+{% endblock %}

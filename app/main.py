@@ -1,0 +1,1204 @@
+import csv
+import io
+import json
+import os
+import re
+import secrets
+import smtplib
+import sqlite3
+import ssl
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from datetime import date, datetime, timedelta, timezone
+from email.message import EmailMessage
+from functools import wraps
+
+from .countries import COUNTRIES
+
+from flask import (
+    Flask,
+    Response,
+    abort,
+    flash,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from werkzeug.security import check_password_hash, generate_password_hash
+
+
+BASE_DIR = os.path.dirname(__file__)
+
+DTO_FIELDS = [
+    "id",
+    "carrier",
+    "plan",
+    "phoneNumber",
+    "countryCode",
+    "countryName",
+    "flag",
+    "cardBackgroundAssetName",
+    "cardColorHex",
+    "cardBackgroundImageData",
+    "carrierAppIconURLString",
+    "carrierAppStoreURLString",
+    "carrierAppName",
+    "activationDate",
+    "expiryDate",
+    "price",
+    "currencyCode",
+    "cyclePaymentMinorUnits",
+    "currentBalanceMinorUnits",
+    "websiteURL",
+    "currentBalance",
+    "transactionNotes",
+    "customPrompt",
+    "tags",
+    "orderIndex",
+    "smdpAddress",
+    "activationCode",
+    "confirmationCode",
+    "eid",
+    "createdAt",
+    "updatedAt",
+    "isLongTerm",
+    "renewDays",
+    "renewalUnit",
+    "renewalIntervalValue",
+]
+
+DTO_TO_COL = {
+    "id": "id",
+    "carrier": "carrier",
+    "plan": "plan",
+    "phoneNumber": "phone_number",
+    "countryCode": "country_code",
+    "countryName": "country_name",
+    "flag": "flag",
+    "cardBackgroundAssetName": "card_background_asset_name",
+    "cardColorHex": "card_color_hex",
+    "cardBackgroundImageData": "card_background_image_data",
+    "carrierAppIconURLString": "carrier_app_icon_url_string",
+    "carrierAppStoreURLString": "carrier_app_store_url_string",
+    "carrierAppName": "carrier_app_name",
+    "activationDate": "activation_date",
+    "expiryDate": "expiry_date",
+    "price": "price",
+    "currencyCode": "currency_code",
+    "cyclePaymentMinorUnits": "cycle_payment_minor_units",
+    "currentBalanceMinorUnits": "current_balance_minor_units",
+    "websiteURL": "website_url",
+    "currentBalance": "current_balance",
+    "transactionNotes": "transaction_notes",
+    "customPrompt": "custom_prompt",
+    "orderIndex": "order_index",
+    "smdpAddress": "smdp_address",
+    "activationCode": "activation_code",
+    "confirmationCode": "confirmation_code",
+    "eid": "eid",
+    "createdAt": "created_at",
+    "updatedAt": "updated_at",
+    "isLongTerm": "is_long_term",
+    "renewDays": "renew_days",
+    "renewalUnit": "renewal_unit",
+    "renewalIntervalValue": "renewal_interval_value",
+}
+
+OPTIONAL_FIELDS = {
+    "cardBackgroundAssetName",
+    "cardColorHex",
+    "cardBackgroundImageData",
+    "carrierAppIconURLString",
+    "carrierAppStoreURLString",
+    "carrierAppName",
+    "currencyCode",
+    "cyclePaymentMinorUnits",
+    "currentBalanceMinorUnits",
+    "websiteURL",
+    "currentBalance",
+    "transactionNotes",
+    "customPrompt",
+    "tags",
+    "orderIndex",
+    "confirmationCode",
+    "updatedAt",
+    "renewalUnit",
+    "renewalIntervalValue",
+}
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not g.user:
+            if request.path.startswith("/api/"):
+                return api_fail("未登录", "UNAUTHORIZED", 401)
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def create_app():
+    app = Flask(__name__)
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+    app.config["DATABASE"] = os.environ.get("DATABASE") or os.path.join(BASE_DIR, "..", "data", "simhub.sqlite")
+    app.config["SMTP_HOST"] = os.environ.get("SMTP_HOST", "")
+    app.config["SMTP_PORT"] = int(os.environ.get("SMTP_PORT") or 587)
+    app.config["SMTP_USERNAME"] = os.environ.get("SMTP_USERNAME", "")
+    app.config["SMTP_PASSWORD"] = os.environ.get("SMTP_PASSWORD", "")
+    app.config["SMTP_FROM"] = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USERNAME", "")
+
+    @app.before_request
+    def before_request():
+        init_db()
+        g.user = current_user()
+        public_endpoints = {"setup", "login", "login_code", "static", "api_status"}
+        if user_count() == 0 and request.endpoint not in public_endpoints:
+            if request.path.startswith("/api/"):
+                return api_fail("请先创建管理员", "SETUP_REQUIRED", 403)
+            return redirect(url_for("setup"))
+
+    @app.context_processor
+    def inject_helpers():
+        return {
+            "csrf_token": csrf_token,
+            "date_input": date_input,
+            "days_left": days_left,
+            "due_badge": due_badge,
+            "price_number": price_number,
+        }
+
+    @app.route("/setup", methods=["GET", "POST"])
+    def setup():
+        if user_count() > 0:
+            return redirect(url_for("dashboard"))
+        if request.method == "POST":
+            validate_csrf()
+            username = request.form.get("username", "").strip() or "admin"
+            password = request.form.get("password", "")
+            confirm = request.form.get("confirm", "")
+            if len(password) < 8:
+                flash("密码至少需要 8 位。", "error")
+            elif password != confirm:
+                flash("两次输入的密码不一致。", "error")
+            else:
+                get_db().execute(
+                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                    (username, hash_password(password)),
+                )
+                get_db().commit()
+                flash("管理员已创建，请登录。", "success")
+                return redirect(url_for("login"))
+        return render_template("setup.html")
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if g.user:
+            return redirect(url_for("dashboard"))
+        if request.method == "POST":
+            validate_csrf()
+            username = request.form.get("username", "").strip()
+            password = request.form.get("password", "")
+            user = get_db().execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+            if user and check_password_hash(user["password_hash"], password):
+                email = user["email"] if "email" in user.keys() else None
+                if email and smtp_configured():
+                    code = f"{secrets.randbelow(1000000):06d}"
+                    try:
+                        send_login_code(email, code)
+                    except Exception:
+                        flash("验证码邮件发送失败，请检查服务端 SMTP 配置。", "error")
+                        return render_template("login.html")
+                    session.clear()
+                    session["csrf_token"] = secrets.token_urlsafe(32)
+                    session["pending_login"] = {
+                        "uid": user["id"],
+                        "code_hash": hash_password(code),
+                        "expires": (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat(),
+                        "email": mask_email(email),
+                        "tries": 0,
+                    }
+                    flash("验证码已发送到你的邮箱。", "success")
+                    return redirect(url_for("login_code"))
+                session.clear()
+                session["user_id"] = user["id"]
+                session["csrf_token"] = secrets.token_urlsafe(32)
+                flash("登录成功。", "success")
+                return redirect(url_for("dashboard"))
+            flash("用户名或密码错误。", "error")
+        return render_template("login.html")
+
+    @app.route("/login/code", methods=["GET", "POST"])
+    def login_code():
+        if g.user:
+            return redirect(url_for("dashboard"))
+        pending = session.get("pending_login")
+        if not pending:
+            return redirect(url_for("login"))
+        if datetime.now(timezone.utc) > datetime.fromisoformat(pending["expires"]):
+            session.pop("pending_login", None)
+            flash("验证码已过期，请重新登录。", "error")
+            return redirect(url_for("login"))
+        if request.method == "POST":
+            validate_csrf()
+            code = request.form.get("code", "").strip()
+            if pending["tries"] >= 5:
+                session.pop("pending_login", None)
+                flash("尝试次数过多，请重新登录。", "error")
+                return redirect(url_for("login"))
+            if check_password_hash(pending["code_hash"], code):
+                uid = pending["uid"]
+                session.clear()
+                session["user_id"] = uid
+                session["csrf_token"] = secrets.token_urlsafe(32)
+                flash("登录成功。", "success")
+                return redirect(url_for("dashboard"))
+            pending["tries"] += 1
+            session["pending_login"] = pending
+            flash("验证码错误。", "error")
+        return render_template("login_code.html", email=pending.get("email", ""))
+
+    @app.route("/logout", methods=["POST"])
+    @login_required
+    def logout():
+        validate_csrf()
+        session.clear()
+        flash("已退出登录。", "success")
+        return redirect(url_for("login"))
+
+    @app.route("/")
+    @login_required
+    def dashboard():
+        return Response(render_spa(), mimetype="text/html; charset=utf-8")
+
+    @app.route("/cards/new", methods=["GET", "POST"])
+    @login_required
+    def new_card():
+        if request.method == "POST":
+            validate_csrf()
+            dto, errors = form_dto()
+            if not errors:
+                dto["id"] = str(uuid.uuid4())
+                dto["orderIndex"] = next_order_index()
+                insert_card(dto)
+                log_activity(dto["id"], "create", "创建卡片")
+                get_db().commit()
+                flash("卡片已添加。", "success")
+                return redirect(url_for("dashboard"))
+            for error in errors:
+                flash(error, "error")
+        return render_template("card_form.html", card=default_dto())
+
+    @app.route("/cards/<card_id>/edit", methods=["GET", "POST"])
+    @login_required
+    def edit_card(card_id):
+        card = get_card(card_id)
+        if request.method == "POST":
+            validate_csrf()
+            dto, errors = form_dto(existing=card)
+            if not errors:
+                dto["id"] = card_id
+                update_card(card_id, dto)
+                log_activity(card_id, "edit", "更新卡片资料")
+                get_db().commit()
+                flash("卡片已更新。", "success")
+                return redirect(url_for("dashboard"))
+            for error in errors:
+                flash(error, "error")
+        return render_template("card_form.html", card=card)
+
+    @app.route("/cards/<card_id>/renew", methods=["POST"])
+    @login_required
+    def renew_card(card_id):
+        validate_csrf()
+        card = get_card(card_id)
+        renew_days = max(int(card.get("renewDays") or 30), 1)
+        start = date.today()
+        expiry = start + timedelta(days=renew_days)
+        updated = dict(card)
+        updated["activationDate"] = iso_datetime(start)
+        updated["expiryDate"] = iso_datetime(expiry)
+        updated["updatedAt"] = now_iso()
+        updated["renewalUnit"] = updated.get("renewalUnit") or "days"
+        updated["renewalIntervalValue"] = updated.get("renewalIntervalValue") or renew_days
+        update_card(card_id, updated)
+        log_activity(card_id, "renew", f"完成续期，顺延 {renew_days} 天")
+        get_db().commit()
+        flash("已按周期顺延到期日。", "success")
+        return redirect(url_for("dashboard"))
+
+    @app.route("/cards/<card_id>/delete", methods=["POST"])
+    @login_required
+    def delete_card_route(card_id):
+        validate_csrf()
+        get_card(card_id)
+        get_db().execute("DELETE FROM cards WHERE id = ?", (card_id,))
+        get_db().commit()
+        flash("卡片已删除。", "success")
+        return redirect(url_for("dashboard"))
+
+    @app.route("/settings/password", methods=["GET", "POST"])
+    @login_required
+    def change_password():
+        if request.method == "POST":
+            validate_csrf()
+            old_password = request.form.get("old_password", "")
+            password = request.form.get("password", "")
+            confirm = request.form.get("confirm", "")
+            user = get_db().execute("SELECT * FROM users WHERE id = ?", (g.user["id"],)).fetchone()
+            if not check_password_hash(user["password_hash"], old_password):
+                flash("当前密码不正确。", "error")
+            elif len(password) < 8:
+                flash("新密码至少需要 8 位。", "error")
+            elif password != confirm:
+                flash("两次输入的新密码不一致。", "error")
+            else:
+                get_db().execute(
+                    "UPDATE users SET password_hash = ? WHERE id = ?",
+                    (hash_password(password), g.user["id"]),
+                )
+                get_db().commit()
+                flash("密码已更新。", "success")
+                return redirect(url_for("dashboard"))
+        return render_template("change_password.html")
+
+    @app.route("/export.csv")
+    @login_required
+    def export_csv():
+        cards = load_cards({})
+        fields = [
+            "carrier",
+            "plan",
+            "phoneNumber",
+            "countryName",
+            "expiryDate",
+            "price",
+            "currencyCode",
+            "currentBalance",
+            "tags",
+            "smdpAddress",
+            "activationCode",
+            "eid",
+        ]
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(fields)
+        for card in cards:
+            writer.writerow([", ".join(card[field]) if field == "tags" else card.get(field, "") for field in fields])
+        return Response(
+            buf.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=simhub-cards.csv"},
+        )
+
+    @app.route("/export.json")
+    @login_required
+    def export_json_page():
+        return export_cards_response(load_cards({}))
+
+    @app.route("/api/status")
+    def api_status():
+        cards = load_cards({}) if user_count() else []
+        updated = max((parse_iso(c.get("updatedAt")) or datetime.fromtimestamp(0, tz=timezone.utc) for c in cards), default=datetime.fromtimestamp(0, tz=timezone.utc))
+        return api_ok(
+            {
+                "deviceName": os.environ.get("SIMHUB_DEVICE_NAME", "SimHub Keeper Linux"),
+                "connectedDevices": 1 if g.user else 0,
+                "dataVersion": updated.timestamp(),
+                "cardCount": len(cards),
+            }
+        )
+
+    @app.route("/api/cards", methods=["GET", "POST"])
+    @login_required
+    def api_cards():
+        if request.method == "GET":
+            return api_ok(load_cards({}))
+        dto = normalize_dto(request.get_json(silent=True) or {})
+        dto["id"] = str(uuid.uuid4())
+        dto["orderIndex"] = next_order_index()
+        insert_card(dto)
+        get_db().commit()
+        return api_ok(dto, 201)
+
+    @app.route("/api/cards/<card_id>", methods=["GET", "PUT", "DELETE"])
+    @login_required
+    def api_card(card_id):
+        card = get_card(card_id)
+        if request.method == "GET":
+            return api_ok(card)
+        if request.method == "DELETE":
+            get_db().execute("DELETE FROM cards WHERE id = ?", (card_id,))
+            get_db().commit()
+            return api_ok({"deleted": True})
+
+        dto = normalize_dto(request.get_json(silent=True) or {}, existing=card)
+        dto["id"] = card_id
+        update_card(card_id, dto)
+        get_db().commit()
+        return api_ok(get_card(card_id))
+
+    @app.route("/api/cards/batch-update", methods=["POST"])
+    @login_required
+    def api_batch_update():
+        body = request.get_json(silent=True) or {}
+        ids = [item for item in body.get("ids", []) if isinstance(item, str)]
+        action = body.get("action", "")
+        if action == "delete":
+            deleted = 0
+            for card_id in set(ids):
+                cur = get_db().execute("DELETE FROM cards WHERE id = ?", (card_id,))
+                deleted += cur.rowcount
+            get_db().commit()
+            return api_ok({"deleted": deleted})
+        if action == "addTags":
+            tags = normalize_tags(body.get("tags", []))
+            updated = 0
+            for card_id in set(ids):
+                try:
+                    card = get_card(card_id)
+                except Exception:
+                    continue
+                card["tags"] = normalize_tags(card.get("tags", []) + tags)
+                update_card(card_id, card)
+                updated += 1
+            get_db().commit()
+            return api_ok({"updated": updated})
+        return api_fail("不支持的批量操作", "BAD_REQUEST", 400)
+
+    @app.route("/api/export")
+    @login_required
+    def api_export():
+        return export_cards_response(load_cards({}))
+
+    @app.route("/api/import", methods=["POST"])
+    @login_required
+    def api_import():
+        body = request.get_json(silent=True) or {}
+        raw_cards = body.get("cards", [])
+        if not isinstance(raw_cards, list):
+            return api_fail("导入 payload 必须是卡片数组", "BAD_REQUEST", 400)
+        dtos = [normalize_dto(item) for item in raw_cards if isinstance(item, dict)]
+        if body.get("mode") != "commit":
+            return api_ok({"count": len(dtos), "cards": dtos})
+
+        imported = 0
+        skipped = 0
+        for dto in dtos:
+            if dto.get("id") and card_exists(dto["id"]):
+                skipped += 1
+                continue
+            dto["id"] = dto.get("id") or str(uuid.uuid4())
+            if duplicate_card(dto):
+                skipped += 1
+                continue
+            dto["orderIndex"] = next_order_index() + imported
+            insert_card(dto)
+            imported += 1
+        get_db().commit()
+        return api_ok({"imported": imported, "skipped": skipped})
+
+    @app.route("/api/countries")
+    @login_required
+    def api_countries():
+        return api_ok(COUNTRIES)
+
+    @app.route("/api/appsearch")
+    @login_required
+    def api_appsearch():
+        term = request.args.get("term", "").strip()
+        country = (request.args.get("country", "US") or "US").upper()
+        if not term:
+            return api_ok([])
+        query = urllib.parse.urlencode(
+            {
+                "term": term,
+                "media": "software",
+                "entity": "software",
+                "limit": "20",
+                "country": country,
+            }
+        )
+        url = "https://itunes.apple.com/search?" + query
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "simhub-keeper-web"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+            return api_fail("App Store 搜索失败，请稍后重试", "APPSEARCH_FAILED", 502)
+        results = []
+        for item in payload.get("results", []):
+            results.append(
+                {
+                    "name": item.get("trackName", ""),
+                    "icon": item.get("artworkUrl512") or item.get("artworkUrl100") or "",
+                    "url": item.get("trackViewUrl", ""),
+                    "seller": item.get("sellerName", ""),
+                }
+            )
+        return api_ok(results)
+
+    @app.route("/api/password", methods=["POST"])
+    @login_required
+    def api_password():
+        body = request.get_json(silent=True) or {}
+        current = body.get("current", "")
+        new_password = body.get("new", "")
+        row = get_db().execute(
+            "SELECT password_hash FROM users WHERE id = ?", (g.user["id"],)
+        ).fetchone()
+        if not row or not check_password_hash(row["password_hash"], current):
+            return api_fail("当前密码不正确", "BAD_PASSWORD", 400)
+        if len(new_password) < 8:
+            return api_fail("新密码至少需要 8 位", "WEAK_PASSWORD", 400)
+        get_db().execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (hash_password(new_password), g.user["id"]),
+        )
+        get_db().commit()
+        return api_ok({"updated": True})
+
+    @app.route("/api/account")
+    @login_required
+    def api_account():
+        row = get_db().execute(
+            "SELECT email FROM users WHERE id = ?", (g.user["id"],)
+        ).fetchone()
+        return api_ok({"email": (row["email"] if row else "") or "", "smtpReady": smtp_configured()})
+
+    @app.route("/api/email", methods=["POST"])
+    @login_required
+    def api_email():
+        body = request.get_json(silent=True) or {}
+        email = (body.get("email") or "").strip()
+        if email and not valid_email(email):
+            return api_fail("邮箱格式不正确", "BAD_EMAIL", 400)
+        get_db().execute(
+            "UPDATE users SET email = ? WHERE id = ?",
+            (email or None, g.user["id"]),
+        )
+        get_db().commit()
+        return api_ok({"email": email, "smtpReady": smtp_configured()})
+
+    @app.teardown_appcontext
+    def close_db(_error):
+        db = g.pop("db", None)
+        if db is not None:
+            db.close()
+
+    @app.errorhandler(404)
+    def not_found(_error):
+        if request.path.startswith("/api/"):
+            return api_fail("未找到资源", "NOT_FOUND", 404)
+        return render_template("404.html"), 404
+
+    return app
+
+
+app = create_app()
+
+
+_SPA_PATH = os.path.join(BASE_DIR, "templates", "spa.html")
+_spa_cache = {}
+
+
+def render_spa():
+    """读取单页应用模板并注入当前会话的 CSRF token。"""
+    mtime = os.path.getmtime(_SPA_PATH)
+    if _spa_cache.get("mtime") != mtime:
+        with open(_SPA_PATH, encoding="utf-8") as fh:
+            _spa_cache["html"] = fh.read()
+        _spa_cache["mtime"] = mtime
+    return _spa_cache["html"].replace("__CSRF_TOKEN__", csrf_token())
+
+
+def get_db():
+    if "db" not in g:
+        db_path = app.config["DATABASE"]
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        g.db = conn
+    return g.db
+
+
+def init_db():
+    if getattr(g, "_db_initialized", False):
+        return
+    with app.open_resource("schema.sql") as fh:
+        get_db().executescript(fh.read().decode("utf-8"))
+    # 轻量迁移：为旧数据库补上 users.email 列
+    columns = {row["name"] for row in get_db().execute("PRAGMA table_info(users)")}
+    if "email" not in columns:
+        get_db().execute("ALTER TABLE users ADD COLUMN email TEXT")
+    get_db().commit()
+    g._db_initialized = True
+
+
+def current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    return get_db().execute("SELECT id, username, email FROM users WHERE id = ?", (user_id,)).fetchone()
+
+
+def user_count():
+    return get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+
+def hash_password(password):
+    return generate_password_hash(password, method="pbkdf2:sha256", salt_length=16)
+
+
+def csrf_token():
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+def validate_csrf():
+    token = request.form.get("csrf_token")
+    if not token or not secrets.compare_digest(token, csrf_token()):
+        abort(400, "Invalid CSRF token")
+
+
+def now_iso():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def valid_email(value):
+    return bool(EMAIL_RE.match(value or ""))
+
+
+def mask_email(email):
+    """把邮箱打码用于提示，例如 ab***@gmail.com。"""
+    try:
+        local, domain = email.split("@", 1)
+    except ValueError:
+        return email
+    if len(local) <= 2:
+        masked = local[0] + "*"
+    else:
+        masked = local[:2] + "*" * max(1, len(local) - 2)
+    return f"{masked}@{domain}"
+
+
+def smtp_configured():
+    return bool(app.config.get("SMTP_HOST") and app.config.get("SMTP_FROM"))
+
+
+def send_login_code(email, code):
+    """通过 SMTP 把一次性登录验证码发送到用户邮箱。"""
+    host = app.config["SMTP_HOST"]
+    port = app.config["SMTP_PORT"]
+    username = app.config["SMTP_USERNAME"]
+    password = app.config["SMTP_PASSWORD"]
+    sender = app.config["SMTP_FROM"]
+
+    msg = EmailMessage()
+    msg["Subject"] = "SIMHUB Web 登录验证码"
+    msg["From"] = sender
+    msg["To"] = email
+    msg.set_content(
+        f"你的 SIMHUB Web 登录验证码是：{code}\n\n"
+        "验证码 5 分钟内有效。如果不是你本人在登录，请忽略本邮件并尽快修改密码。"
+    )
+
+    if port == 465:
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(host, port, timeout=15, context=context) as server:
+            if username:
+                server.login(username, password)
+            server.send_message(msg)
+    else:
+        with smtplib.SMTP(host, port, timeout=15) as server:
+            server.ehlo()
+            if server.has_extn("starttls"):
+                server.starttls(context=ssl.create_default_context())
+                server.ehlo()
+            if username:
+                server.login(username, password)
+            server.send_message(msg)
+
+
+def parse_iso(value):
+    if not value:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        text += "T00:00:00Z"
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def iso_datetime(value, fallback=None):
+    if isinstance(value, date) and not isinstance(value, datetime):
+        value = datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+    elif isinstance(value, datetime):
+        value = value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    else:
+        value = parse_iso(value) or fallback or datetime.now(timezone.utc)
+    return value.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def date_input(value):
+    parsed = parse_iso(value)
+    return parsed.date().isoformat() if parsed else ""
+
+
+def days_left(card):
+    parsed = parse_iso(card.get("expiryDate"))
+    if not parsed:
+        return None
+    return (parsed.date() - date.today()).days
+
+
+def due_badge(card):
+    if card.get("isLongTerm"):
+        return {"key": "long", "label": "长期保号"}
+    days = days_left(card)
+    if days is None:
+        return {"key": "unknown", "label": "未设置"}
+    if days < 0:
+        return {"key": "overdue", "label": f"过期 {abs(days)} 天"}
+    if days <= 7:
+        return {"key": "urgent", "label": f"{days} 天内"}
+    if days <= 30:
+        return {"key": "soon", "label": f"{days} 天后"}
+    return {"key": "ok", "label": f"{days} 天后"}
+
+
+def normalize_tags(value):
+    if isinstance(value, str):
+        raw = re.split(r"[,，;；\n]", value)
+    elif isinstance(value, list):
+        raw = value
+    else:
+        raw = []
+    seen = set()
+    tags = []
+    for item in raw:
+        tag = str(item).strip()
+        key = tag.lower()
+        if tag and key not in seen:
+            seen.add(key)
+            tags.append(tag)
+    return tags
+
+
+def default_dto():
+    now = datetime.now(timezone.utc)
+    expiry = now + timedelta(days=30)
+    return normalize_dto(
+        {
+            "carrier": "",
+            "plan": "",
+            "phoneNumber": "",
+            "countryCode": "",
+            "countryName": "",
+            "flag": "🌐",
+            "activationDate": iso_datetime(now),
+            "expiryDate": iso_datetime(expiry),
+            "price": "",
+            "currencyCode": "USD",
+            "tags": [],
+            "renewDays": 30,
+            "renewalUnit": "days",
+            "renewalIntervalValue": 30,
+        }
+    )
+
+
+def normalize_dto(data, existing=None):
+    base = dict(existing or default_dto_raw())
+    base.update(data or {})
+
+    activation = iso_datetime(base.get("activationDate"))
+    expiry_fallback = (parse_iso(activation) or datetime.now(timezone.utc)) + timedelta(days=30)
+    expiry = iso_datetime(base.get("expiryDate"), fallback=expiry_fallback)
+    renew_days = parse_int(base.get("renewDays"), inferred_days(activation, expiry))
+
+    dto = {
+        "id": str(base.get("id") or ""),
+        "carrier": str(base.get("carrier") or "").strip(),
+        "plan": str(base.get("plan") or "").strip(),
+        "phoneNumber": str(base.get("phoneNumber") or "").strip(),
+        "countryCode": str(base.get("countryCode") or "").strip().upper(),
+        "countryName": str(base.get("countryName") or "").strip(),
+        "flag": str(base.get("flag") or "🌐").strip() or "🌐",
+        "cardBackgroundAssetName": blank_none(base.get("cardBackgroundAssetName")),
+        "cardColorHex": blank_none(base.get("cardColorHex")),
+        "cardBackgroundImageData": blank_none(base.get("cardBackgroundImageData")),
+        "carrierAppIconURLString": blank_none(base.get("carrierAppIconURLString")),
+        "carrierAppStoreURLString": blank_none(base.get("carrierAppStoreURLString")),
+        "carrierAppName": blank_none(base.get("carrierAppName")),
+        "activationDate": activation,
+        "expiryDate": expiry,
+        "price": str(base.get("price") or "").strip(),
+        "currencyCode": blank_none(str(base.get("currencyCode") or "").strip().upper()),
+        "cyclePaymentMinorUnits": parse_optional_int(base.get("cyclePaymentMinorUnits")),
+        "currentBalanceMinorUnits": parse_optional_int(base.get("currentBalanceMinorUnits")),
+        "websiteURL": blank_none(base.get("websiteURL")),
+        "currentBalance": blank_none(base.get("currentBalance")),
+        "transactionNotes": blank_none(base.get("transactionNotes")),
+        "customPrompt": blank_none(base.get("customPrompt")),
+        "tags": normalize_tags(base.get("tags")),
+        "orderIndex": parse_int(base.get("orderIndex"), 0),
+        "smdpAddress": str(base.get("smdpAddress") or "").strip(),
+        "activationCode": str(base.get("activationCode") or "").strip(),
+        "confirmationCode": blank_none(base.get("confirmationCode")),
+        "eid": str(base.get("eid") or "").strip(),
+        "createdAt": iso_datetime(base.get("createdAt")),
+        "updatedAt": iso_datetime(base.get("updatedAt") or now_iso()),
+        "isLongTerm": parse_bool(base.get("isLongTerm")),
+        "renewDays": renew_days,
+        "renewalUnit": blank_none(base.get("renewalUnit")) or "days",
+        "renewalIntervalValue": parse_optional_int(base.get("renewalIntervalValue")) or renew_days,
+    }
+    return dto
+
+
+def default_dto_raw():
+    now = now_iso()
+    expiry = iso_datetime(datetime.now(timezone.utc) + timedelta(days=30))
+    return {
+        "id": "",
+        "carrier": "",
+        "plan": "",
+        "phoneNumber": "",
+        "countryCode": "",
+        "countryName": "",
+        "flag": "🌐",
+        "activationDate": now,
+        "expiryDate": expiry,
+        "price": "",
+        "currencyCode": "USD",
+        "tags": [],
+        "orderIndex": 0,
+        "smdpAddress": "",
+        "activationCode": "",
+        "eid": "",
+        "createdAt": now,
+        "updatedAt": now,
+        "isLongTerm": False,
+        "renewDays": 30,
+        "renewalUnit": "days",
+        "renewalIntervalValue": 30,
+    }
+
+
+def form_dto(existing=None):
+    tags = request.form.get("tags", "")
+    data = {
+        "carrier": request.form.get("carrier", ""),
+        "plan": request.form.get("plan", ""),
+        "phoneNumber": request.form.get("phoneNumber", ""),
+        "countryCode": request.form.get("countryCode", ""),
+        "countryName": request.form.get("countryName", ""),
+        "flag": request.form.get("flag", "🌐"),
+        "carrierAppIconURLString": request.form.get("carrierAppIconURLString", ""),
+        "carrierAppStoreURLString": request.form.get("carrierAppStoreURLString", ""),
+        "carrierAppName": request.form.get("carrierAppName", ""),
+        "activationDate": request.form.get("activationDate", ""),
+        "expiryDate": request.form.get("expiryDate", ""),
+        "price": request.form.get("price", ""),
+        "currencyCode": request.form.get("currencyCode", ""),
+        "cyclePaymentMinorUnits": request.form.get("cyclePaymentMinorUnits", ""),
+        "currentBalanceMinorUnits": request.form.get("currentBalanceMinorUnits", ""),
+        "websiteURL": request.form.get("websiteURL", ""),
+        "currentBalance": request.form.get("currentBalance", ""),
+        "transactionNotes": request.form.get("transactionNotes", ""),
+        "customPrompt": request.form.get("customPrompt", ""),
+        "tags": tags,
+        "smdpAddress": request.form.get("smdpAddress", ""),
+        "activationCode": request.form.get("activationCode", ""),
+        "confirmationCode": request.form.get("confirmationCode", ""),
+        "eid": request.form.get("eid", ""),
+        "isLongTerm": request.form.get("isLongTerm") == "on",
+        "renewDays": request.form.get("renewDays", ""),
+        "renewalUnit": request.form.get("renewalUnit", "days"),
+        "renewalIntervalValue": request.form.get("renewalIntervalValue", ""),
+    }
+    dto = normalize_dto(data, existing=existing)
+    errors = []
+    if not dto["carrier"]:
+        errors.append("运营商名称不能为空。")
+    digits = "".join(ch for ch in dto["phoneNumber"] if ch.isdigit())
+    if dto["phoneNumber"] and len(digits) < 4:
+        errors.append("电话号码至少需要 4 位数字。")
+    return dto, errors
+
+
+def row_to_dto(row):
+    dto = {}
+    for key in DTO_FIELDS:
+        if key == "tags":
+            try:
+                dto[key] = json.loads(row["tags_json"] or "[]")
+            except json.JSONDecodeError:
+                dto[key] = []
+            continue
+        column = DTO_TO_COL.get(key)
+        value = row[column] if column else None
+        if key == "isLongTerm":
+            value = bool(value)
+        dto[key] = value
+    return dto
+
+
+def dto_values(dto):
+    return [
+        dto["id"],
+        dto["carrier"],
+        dto["plan"],
+        dto["phoneNumber"],
+        dto["countryCode"],
+        dto["countryName"],
+        dto["flag"],
+        dto.get("cardBackgroundAssetName"),
+        dto.get("cardColorHex"),
+        dto.get("cardBackgroundImageData"),
+        dto.get("carrierAppIconURLString"),
+        dto.get("carrierAppStoreURLString"),
+        dto.get("carrierAppName"),
+        dto["activationDate"],
+        dto["expiryDate"],
+        dto["price"],
+        dto.get("currencyCode"),
+        dto.get("cyclePaymentMinorUnits"),
+        dto.get("currentBalanceMinorUnits"),
+        dto.get("websiteURL"),
+        dto.get("currentBalance"),
+        dto.get("transactionNotes"),
+        dto.get("customPrompt"),
+        json.dumps(dto.get("tags") or [], ensure_ascii=False),
+        dto.get("orderIndex") or 0,
+        dto["smdpAddress"],
+        dto["activationCode"],
+        dto.get("confirmationCode"),
+        dto["eid"],
+        dto["createdAt"],
+        dto["updatedAt"],
+        1 if dto.get("isLongTerm") else 0,
+        dto.get("renewDays") or 30,
+        dto.get("renewalUnit"),
+        dto.get("renewalIntervalValue"),
+    ]
+
+
+def insert_card(dto):
+    get_db().execute(
+        """
+        INSERT INTO cards (
+            id, carrier, plan, phone_number, country_code, country_name, flag,
+            card_background_asset_name, card_color_hex, card_background_image_data,
+            carrier_app_icon_url_string, carrier_app_store_url_string, carrier_app_name,
+            activation_date, expiry_date, price, currency_code, cycle_payment_minor_units,
+            current_balance_minor_units, website_url, current_balance, transaction_notes,
+            custom_prompt, tags_json, order_index, smdp_address, activation_code,
+            confirmation_code, eid, created_at, updated_at, is_long_term, renew_days,
+            renewal_unit, renewal_interval_value
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        dto_values(dto),
+    )
+
+
+def update_card(card_id, dto):
+    dto["updatedAt"] = now_iso()
+    values = dto_values(dto)[1:] + [card_id]
+    get_db().execute(
+        """
+        UPDATE cards
+           SET carrier = ?, plan = ?, phone_number = ?, country_code = ?, country_name = ?, flag = ?,
+               card_background_asset_name = ?, card_color_hex = ?, card_background_image_data = ?,
+               carrier_app_icon_url_string = ?, carrier_app_store_url_string = ?, carrier_app_name = ?,
+               activation_date = ?, expiry_date = ?, price = ?, currency_code = ?, cycle_payment_minor_units = ?,
+               current_balance_minor_units = ?, website_url = ?, current_balance = ?, transaction_notes = ?,
+               custom_prompt = ?, tags_json = ?, order_index = ?, smdp_address = ?, activation_code = ?,
+               confirmation_code = ?, eid = ?, created_at = ?, updated_at = ?, is_long_term = ?,
+               renew_days = ?, renewal_unit = ?, renewal_interval_value = ?
+         WHERE id = ?
+        """,
+        values,
+    )
+
+
+def get_card(card_id):
+    row = get_db().execute("SELECT * FROM cards WHERE id = ?", (card_id,)).fetchone()
+    if not row:
+        abort(404)
+    return row_to_dto(row)
+
+
+def load_cards(filters):
+    where = []
+    args = []
+    q = filters.get("q")
+    if q:
+        where.append(
+            "(carrier LIKE ? OR plan LIKE ? OR phone_number LIKE ? OR country_name LIKE ? OR eid LIKE ? OR smdp_address LIKE ?)"
+        )
+        like = f"%{q}%"
+        args.extend([like, like, like, like, like, like])
+    country = filters.get("country")
+    if country:
+        where.append("country_name = ?")
+        args.append(country)
+
+    sql = "SELECT * FROM cards"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY order_index ASC, expiry_date ASC"
+    cards = [row_to_dto(row) for row in get_db().execute(sql, args).fetchall()]
+
+    due = filters.get("due")
+    if due:
+        cards = [card for card in cards if due_badge(card)["key"] == due]
+    tag = filters.get("tag")
+    if tag:
+        cards = [card for card in cards if tag in card.get("tags", [])]
+    return cards
+
+
+def next_order_index():
+    return (get_db().execute("SELECT MAX(order_index) FROM cards").fetchone()[0] or -1) + 1
+
+
+def card_exists(card_id):
+    return bool(get_db().execute("SELECT 1 FROM cards WHERE id = ?", (card_id,)).fetchone())
+
+
+def duplicate_card(dto):
+    phone = dto.get("phoneNumber", "").strip()
+    eid = dto.get("eid", "").strip()
+    activation = dto.get("activationCode", "").strip()
+    smdp = dto.get("smdpAddress", "").strip()
+    if phone:
+        if get_db().execute("SELECT 1 FROM cards WHERE phone_number = ?", (phone,)).fetchone():
+            return True
+    if eid:
+        if get_db().execute("SELECT 1 FROM cards WHERE eid = ?", (eid,)).fetchone():
+            return True
+    if activation and smdp:
+        if get_db().execute(
+            "SELECT 1 FROM cards WHERE activation_code = ? AND smdp_address = ?",
+            (activation, smdp),
+        ).fetchone():
+            return True
+    return False
+
+
+def calculate_stats(cards):
+    badges = [due_badge(card) for card in cards]
+    return {
+        "total": len(cards),
+        "overdue": sum(1 for item in badges if item["key"] == "overdue"),
+        "urgent": sum(1 for item in badges if item["key"] == "urgent"),
+        "soon": sum(1 for item in badges if item["key"] == "soon"),
+        "long": sum(1 for item in badges if item["key"] == "long"),
+        "monthly_fee": sum(price_number(card.get("price")) for card in cards),
+        "countries": len({card.get("countryName") for card in cards if card.get("countryName")}),
+    }
+
+
+def price_number(value):
+    if not value:
+        return 0.0
+    match = re.search(r"-?\d+(?:[.,]\d+)?", str(value).replace(",", "."))
+    return float(match.group(0)) if match else 0.0
+
+
+def parse_int(value, default):
+    try:
+        return max(int(value), 0)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_optional_int(value):
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value != 0
+    return str(value).lower() in {"1", "true", "yes", "on"}
+
+
+def blank_none(value):
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def inferred_days(start_iso, end_iso):
+    start = parse_iso(start_iso)
+    end = parse_iso(end_iso)
+    if not start or not end:
+        return 30
+    return max((end.date() - start.date()).days, 1)
+
+
+def api_envelope(success, data=None, message=None, code=None):
+    return {"success": success, "data": data, "message": message, "code": code}
+
+
+def api_ok(data, status=200):
+    return jsonify(api_envelope(True, data, None, None)), status
+
+
+def api_fail(message, code, status):
+    return jsonify(api_envelope(False, None, message, code)), status
+
+
+def export_cards_response(cards):
+    body = json.dumps(cards, ensure_ascii=False, indent=2, sort_keys=True)
+    return Response(
+        body,
+        mimetype="application/json; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=simhub-export.json"},
+    )
+
+
+def log_activity(card_id, action, note):
+    get_db().execute(
+        "INSERT INTO activity_log (card_id, action, note) VALUES (?, ?, ?)",
+        (card_id, action, note),
+    )
+
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=8080, debug=True)

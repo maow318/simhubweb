@@ -1,0 +1,22 @@
+[Unit]
+Description=SimHub Keeper Web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/simhub-keeper-web
+EnvironmentFile=/etc/simhub-keeper.env
+ExecStart=/opt/simhub-keeper-web/.venv/bin/gunicorn -b 127.0.0.1:8080 app.main:app
+Restart=always
+RestartSec=5
+User=simhub
+Group=simhub
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/simhub-keeper
+
+[Install]
+WantedBy=multi-user.target

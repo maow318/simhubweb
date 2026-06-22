@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}未找到 - SIMHUB Web{% endblock %}
+{% block content %}
+<section class="empty-state">
+  <h2>未找到页面</h2>
+  <p>这个地址没有对应的资源。</p>
+  <a class="primary-action" href="{{ url_for('dashboard') }}">回到卡片列表</a>
+</section>
+{% endblock %}

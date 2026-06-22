@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>登录 · SIMHUB Web</title>
+<style>
+:root{--bg:#f2f2f7;--card:#fff;--text:#1c1c1e;--sub:#8e8e93;--line:#e5e5ea;--accent:#0a84ff;--danger:#ff3b30;--ok:#34c759;--shadow:0 8px 24px rgba(0,0,0,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#f2f2f7;--sub:#8e8e93;--line:#2c2c2e;--shadow:none}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.loginCard{background:var(--card);border-radius:24px;box-shadow:var(--shadow);padding:34px 28px;width:100%;max-width:380px}
+.logo{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#0a84ff,#5ac8fa);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#fff;font-size:30px;font-weight:700}
+h1{font-size:22px;margin:0 0 4px;text-align:center}
+.subtitle{color:var(--sub);font-size:13px;text-align:center;margin:0 0 22px}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:13px;color:var(--sub);margin-bottom:5px}
+input{font:inherit;width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--text);outline:none}
+input:focus{border-color:var(--accent)}
+button{font:inherit;width:100%;margin-top:8px;cursor:pointer;border:none;border-radius:12px;padding:12px;background:var(--accent);color:#fff;font-weight:600;font-size:15px}
+button:active{opacity:.85}
+.flash{font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:13px}
+.flash.error{background:rgba(255,59,48,.14);color:var(--danger)}
+.flash.success{background:rgba(52,199,89,.16);color:var(--ok)}
+</style>
+</head>
+<body>
+<form class="loginCard" method="post">
+  <div class="logo">S</div>
+  <h1>SIMHUB Web 管理</h1>
+  <p class="subtitle">输入账号与密码登录</p>
+  <div id="flashHost"></div>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="field">
+    <label>用户名</label>
+    <input name="username" autocomplete="username" required autofocus>
+  </div>
+  <div class="field">
+    <label>密码</label>
+    <input name="password" type="password" autocomplete="current-password" required>
+  </div>
+  <button type="submit">登录</button>
+</form>
+<script>
+const FLASHES=[{% for category, message in get_flashed_messages(with_categories=true) %}["{{ category }}",{{ message|tojson }}],{% endfor %}];
+const host=document.getElementById("flashHost");
+FLASHES.forEach(([c,m])=>{const d=document.createElement("div");d.className="flash "+c;d.textContent=m;host.appendChild(d);});
+</script>
+</body>
+</html>
