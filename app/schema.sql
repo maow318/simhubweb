@@ -56,3 +56,24 @@ CREATE TABLE IF NOT EXISTS activity_log (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    smtp_host TEXT NOT NULL DEFAULT '',
+    smtp_port INTEGER NOT NULL DEFAULT 465,
+    smtp_username TEXT NOT NULL DEFAULT '',
+    smtp_password TEXT NOT NULL DEFAULT '',
+    recipient TEXT NOT NULL DEFAULT '',
+    twofa_enabled INTEGER NOT NULL DEFAULT 0,
+    reminder_enabled INTEGER NOT NULL DEFAULT 0,
+    reminder_days_before INTEGER NOT NULL DEFAULT 3,
+    last_reminder_date TEXT NOT NULL DEFAULT ''
+);
+
+INSERT OR IGNORE INTO settings (id) VALUES (1);
+
+CREATE TABLE IF NOT EXISTS reminder_log (
+    card_id TEXT NOT NULL,
+    sent_date TEXT NOT NULL,
+    PRIMARY KEY (card_id, sent_date)
+);

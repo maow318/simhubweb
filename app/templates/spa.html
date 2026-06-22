@@ -419,27 +419,36 @@ function renderSettings(){
     <div class="panel"><h3>外观</h3>
       <label style="display:flex;align-items:center;justify-content:space-between"><span>深色模式</span>
         <input type="checkbox" id="darkChk" ${document.body.classList.contains('dark')?'checked':''} style="width:auto"></label></div>
-    <div class="panel"><h3>账户安全</h3><div class="field"><label>当前密码</label><input id="pwCur" type="password" placeholder="当前登录密码"></div><div class="field"><label>新密码</label><input id="pwNew" type="password" placeholder="至少 8 位"></div><div class="field"><label>确认新密码</label><input id="pwNew2" type="password"></div><button id="pwBtn">修改密码</button></div><div class="panel"><h3>邮箱两步验证</h3><p class="sub" id="smtpHint" style="margin-top:0">登录时会向此邮箱额外发送一次性验证码，需同时输入密码与验证码才能登录；留空则关闭。</p><div class="field"><label>接收验证码的邮箱</label><input id="emailInput" type="email" placeholder="you@example.com"></div><button id="emailBtn">保存邮箱</button></div><div class="panel"><h3>会话</h3><p class="sub" style="margin-top:0">退出后需重新输入密码登录。</p><button class="sec" id="dcBtn">退出登录</button></div>`;
+    <div class="panel"><h3>账户安全</h3><div class="field"><label>当前密码</label><input id="pwCur" type="password" placeholder="当前登录密码"></div><div class="field"><label>新密码</label><input id="pwNew" type="password" placeholder="至少 8 位"></div><div class="field"><label>确认新密码</label><input id="pwNew2" type="password"></div><button id="pwBtn">修改密码</button></div><div class="panel"><h3>邮件 / 邮箱验证</h3><p class="sub" id="smtpHint" style="margin-top:0">填好发信邮箱后，可开启登录两步验证与卡片到期提醒。</p><div class="field"><label>信箱服务商</label><select id="smProvider"><option value="qq">QQ邮箱</option><option value="gmail">Gmail</option><option value="163">网易163</option><option value="126">网易126</option><option value="custom">自订</option></select></div><div class="field"><label>SMTP 服务器 / 端口</label><div class="two"><input id="smHost" placeholder="smtp.example.com"><input id="smPort" style="max-width:96px" inputmode="numeric"></div></div><div class="field"><label>发信邮箱地址</label><input id="smUser" type="email" placeholder="you@example.com"></div><div class="field"><label>授权码 / 应用专用密码</label><input id="smPass" type="password" placeholder="授权码 / 应用专用密码"></div><p class="sub" style="margin:-4px 0 0">不是邮箱登录密码：QQ / 网易在邮箱设置里开启 SMTP 取得「授权码」；Gmail 使用「应用专用密码」。</p><div class="field" style="margin-top:13px"><label>收件邮箱（留空＝发给自己）</label><input id="smRcpt" type="email" placeholder="留空则发到发信邮箱"></div><div class="field"><label class="ltrow"><span>登录两步验证</span><input type="checkbox" id="smTwofa"></label></div><div class="field"><label class="ltrow"><span>卡片到期提醒邮件</span><input type="checkbox" id="smRemind"></label></div><div class="field"><label>提前几天提醒</label><input id="smDays" style="max-width:96px" inputmode="numeric" value="3"></div><div class="drawerActions"><button id="smSave" style="flex:1">保存</button><button class="sec" id="smTest">寄送测试邮件</button></div></div><div class="panel"><h3>会话</h3><p class="sub" style="margin-top:0">退出后需重新输入密码登录。</p><button class="sec" id="dcBtn">退出登录</button></div>`;
   document.getElementById('maskChk').onchange=e=>{maskDefault=e.target.checked;localStorage.setItem('simhub_mask',maskDefault?'on':'off');revealed.clear();};
   document.getElementById('darkChk').onchange=e=>{localStorage.setItem('simhub_theme',e.target.checked?'dark':'light');document.body.classList.toggle('dark',e.target.checked);};
   document.getElementById('dcBtn').onclick=logout;
   document.getElementById('pwBtn').onclick=changePassword;
-  document.getElementById('emailBtn').onclick=saveEmail;
+  document.getElementById('smProvider').onchange=applyProvider;
+  document.getElementById('smSave').onclick=saveSmtp;
+  document.getElementById('smTest').onclick=testSmtp;
   loadAccount();
 }
 
+const SMTP_PRESETS={qq:['smtp.qq.com',465],gmail:['smtp.gmail.com',465],'163':['smtp.163.com',465],'126':['smtp.126.com',465]};
+function applyProvider(){const p=dG('smProvider').value;if(SMTP_PRESETS[p]){dG('smHost').value=SMTP_PRESETS[p][0];dG('smPort').value=SMTP_PRESETS[p][1];}}
+function smtpBody(){const b={host:dG('smHost').value.trim(),port:parseInt(dG('smPort').value)||465,username:dG('smUser').value.trim(),recipient:dG('smRcpt').value.trim(),twofaEnabled:dG('smTwofa').checked,reminderEnabled:dG('smRemind').checked,reminderDaysBefore:parseInt(dG('smDays').value)||3};const pw=dG('smPass').value;if(pw)b.password=pw;return b;}
 async function loadAccount(){
-  try{const a=await api('/api/account');
-    dG('emailInput').value=a.email||'';
-    dG('smtpHint').textContent=a.smtpReady
-      ?'登录时会向此邮箱额外发送一次性验证码，需同时输入密码与验证码才能登录；留空则关闭。'
-      :'\u26a0\ufe0f 服务端尚未配置 SMTP，即使填写邮箱也无法发送验证码（请在服务端设置 SMTP_* 环境变量）。';
+  try{const a=await api('/api/smtp');
+    dG('smHost').value=a.host||'';dG('smPort').value=a.port||465;
+    dG('smUser').value=a.username||'';dG('smRcpt').value=a.recipient||'';
+    dG('smPass').value='';dG('smPass').placeholder=a.hasPassword?'已保存，留空表示不修改':'授权码 / 应用专用密码';
+    dG('smTwofa').checked=a.twofaEnabled;dG('smRemind').checked=a.reminderEnabled;dG('smDays').value=a.reminderDaysBefore||3;
+    let prov='custom';for(const k in SMTP_PRESETS){if(SMTP_PRESETS[k][0]===a.host)prov=k;}dG('smProvider').value=prov;
   }catch(e){}
 }
-async function saveEmail(){
-  try{const a=await api('/api/email',{method:'POST',body:JSON.stringify({email:dG('emailInput').value.trim()})});
-    toast(a.email?'已开启邮箱两步验证':'已关闭邮箱两步验证');
-  }catch(e){toast(e.message||'保存失败');}
+async function saveSmtp(){
+  try{await api('/api/smtp',{method:'POST',body:JSON.stringify(smtpBody())});toast('已保存');loadAccount();}
+  catch(e){toast(e.message||'保存失败');}
+}
+async function testSmtp(){
+  try{await api('/api/smtp',{method:'POST',body:JSON.stringify(smtpBody())});const r=await api('/api/smtp/test',{method:'POST'});toast('测试邮件已发送到 '+r.to);loadAccount();}
+  catch(e){toast(e.message||'发送失败');}
 }
 async function changePassword(){
   const cur=dG('pwCur').value, n1=dG('pwNew').value, n2=dG('pwNew2').value;

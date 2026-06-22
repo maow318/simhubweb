@@ -1,4 +1,6 @@
+import base64
 import csv
+import hashlib
 import io
 import json
 import os
@@ -149,11 +151,6 @@ def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
     app.config["DATABASE"] = os.environ.get("DATABASE") or os.path.join(BASE_DIR, "..", "data", "simhub.sqlite")
-    app.config["SMTP_HOST"] = os.environ.get("SMTP_HOST", "")
-    app.config["SMTP_PORT"] = int(os.environ.get("SMTP_PORT") or 587)
-    app.config["SMTP_USERNAME"] = os.environ.get("SMTP_USERNAME", "")
-    app.config["SMTP_PASSWORD"] = os.environ.get("SMTP_PASSWORD", "")
-    app.config["SMTP_FROM"] = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USERNAME", "")
 
     @app.before_request
     def before_request():
@@ -208,13 +205,15 @@ def create_app():
             password = request.form.get("password", "")
             user = get_db().execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
             if user and check_password_hash(user["password_hash"], password):
-                email = user["email"] if "email" in user.keys() else None
-                if email and smtp_configured():
+                settings_row = get_settings()
+                two_fa = settings_row and settings_row["twofa_enabled"] and smtp_configured()
+                email = smtp_config()["recipient"] if two_fa else None
+                if two_fa and email:
                     code = f"{secrets.randbelow(1000000):06d}"
                     try:
                         send_login_code(email, code)
                     except Exception:
-                        flash("验证码邮件发送失败，请检查服务端 SMTP 配置。", "error")
+                        flash("验证码邮件发送失败，请检查 SMTP 配置。", "error")
                         return render_template("login.html")
                     session.clear()
                     session["csrf_token"] = secrets.token_urlsafe(32)
@@ -276,6 +275,10 @@ def create_app():
     @app.route("/")
     @login_required
     def dashboard():
+        try:
+            run_due_reminders()
+        except Exception:
+            pass
         return Response(render_spa(), mimetype="text/html; charset=utf-8")
 
     @app.route("/cards/new", methods=["GET", "POST"])
@@ -565,27 +568,79 @@ def create_app():
         get_db().commit()
         return api_ok({"updated": True})
 
-    @app.route("/api/account")
+    @app.route("/api/smtp")
     @login_required
-    def api_account():
-        row = get_db().execute(
-            "SELECT email FROM users WHERE id = ?", (g.user["id"],)
-        ).fetchone()
-        return api_ok({"email": (row["email"] if row else "") or "", "smtpReady": smtp_configured()})
+    def api_smtp_get():
+        row = get_settings()
+        return api_ok(
+            {
+                "host": row["smtp_host"],
+                "port": row["smtp_port"],
+                "username": row["smtp_username"],
+                "hasPassword": bool(row["smtp_password"]),
+                "recipient": row["recipient"],
+                "twofaEnabled": bool(row["twofa_enabled"]),
+                "reminderEnabled": bool(row["reminder_enabled"]),
+                "reminderDaysBefore": row["reminder_days_before"],
+                "ready": smtp_configured(),
+            }
+        )
 
-    @app.route("/api/email", methods=["POST"])
+    @app.route("/api/smtp", methods=["POST"])
     @login_required
-    def api_email():
+    def api_smtp_save():
         body = request.get_json(silent=True) or {}
-        email = (body.get("email") or "").strip()
-        if email and not valid_email(email):
-            return api_fail("邮箱格式不正确", "BAD_EMAIL", 400)
+        host = (body.get("host") or "").strip()
+        username = (body.get("username") or "").strip()
+        recipient = (body.get("recipient") or "").strip()
+        try:
+            port = int(body.get("port") or 465)
+        except (TypeError, ValueError):
+            return api_fail("端口必须是数字", "BAD_PORT", 400)
+        if username and not valid_email(username):
+            return api_fail("发信邮箱格式不正确", "BAD_EMAIL", 400)
+        if recipient and not valid_email(recipient):
+            return api_fail("收件邮箱格式不正确", "BAD_EMAIL", 400)
+        row = get_settings()
+        # 密码留空表示不修改；传入新值则加密保存
+        password = body.get("password")
+        if password is None or password == "":
+            enc = row["smtp_password"]
+        else:
+            enc = encrypt_secret(password.strip())
         get_db().execute(
-            "UPDATE users SET email = ? WHERE id = ?",
-            (email or None, g.user["id"]),
+            """UPDATE settings SET smtp_host=?, smtp_port=?, smtp_username=?, smtp_password=?,
+               recipient=?, twofa_enabled=?, reminder_enabled=?, reminder_days_before=? WHERE id=1""",
+            (
+                host,
+                port,
+                username,
+                enc,
+                recipient,
+                1 if body.get("twofaEnabled") else 0,
+                1 if body.get("reminderEnabled") else 0,
+                max(int(body.get("reminderDaysBefore") or 3), 0),
+            ),
         )
         get_db().commit()
-        return api_ok({"email": email, "smtpReady": smtp_configured()})
+        return api_ok({"ready": smtp_configured()})
+
+    @app.route("/api/smtp/test", methods=["POST"])
+    @login_required
+    def api_smtp_test():
+        cfg = smtp_config()
+        target = cfg["recipient"] or cfg["username"]
+        if not target:
+            return api_fail("请先填写发信邮箱", "NO_RECIPIENT", 400)
+        try:
+            send_email(
+                target,
+                "SIMHUB Web 测试邮件",
+                "这是一封来自 SIMHUB Web 的测试邮件。能收到说明 SMTP 配置正确。",
+            )
+        except Exception as exc:
+            return api_fail(f"发送失败：{exc}", "SEND_FAILED", 502)
+        return api_ok({"sent": True, "to": mask_email(target)})
 
     @app.teardown_appcontext
     def close_db(_error):
@@ -698,42 +753,144 @@ def mask_email(email):
     return f"{masked}@{domain}"
 
 
+def _keystream(length, salt):
+    """基于 SECRET_KEY 派生的伪随机字节流，用于对授权码做对称加密。"""
+    key = app.config["SECRET_KEY"].encode()
+    out = b""
+    counter = 0
+    while len(out) < length:
+        out += hashlib.sha256(key + salt + counter.to_bytes(4, "big")).digest()
+        counter += 1
+    return out[:length]
+
+
+def encrypt_secret(plaintext):
+    """用 SECRET_KEY 加密授权码后存库（避免在 SQLite 里明文存储）。"""
+    if not plaintext:
+        return ""
+    data = plaintext.encode()
+    salt = secrets.token_bytes(8)
+    ks = _keystream(len(data), salt)
+    cipher = bytes(a ^ b for a, b in zip(data, ks))
+    return base64.b64encode(salt + cipher).decode()
+
+
+def decrypt_secret(token):
+    if not token:
+        return ""
+    try:
+        raw = base64.b64decode(token)
+        salt, cipher = raw[:8], raw[8:]
+        ks = _keystream(len(cipher), salt)
+        return bytes(a ^ b for a, b in zip(cipher, ks)).decode()
+    except Exception:
+        return ""
+
+
+def get_settings():
+    return get_db().execute("SELECT * FROM settings WHERE id = 1").fetchone()
+
+
+def smtp_config():
+    """合并数据库配置（优先）与环境变量（兜底），返回可用的 SMTP 参数。"""
+    row = get_settings()
+    host = (row["smtp_host"] if row else "") or os.environ.get("SMTP_HOST", "")
+    username = (row["smtp_username"] if row else "") or os.environ.get("SMTP_USERNAME", "")
+    password = decrypt_secret(row["smtp_password"]) if row and row["smtp_password"] else os.environ.get("SMTP_PASSWORD", "")
+    port = (row["smtp_port"] if row and row["smtp_port"] else None) or int(os.environ.get("SMTP_PORT") or 465)
+    recipient = (row["recipient"] if row else "") or username
+    return {
+        "host": host,
+        "port": int(port),
+        "username": username,
+        "password": password,
+        "sender": username or os.environ.get("SMTP_FROM", ""),
+        "recipient": recipient,
+    }
+
+
 def smtp_configured():
-    return bool(app.config.get("SMTP_HOST") and app.config.get("SMTP_FROM"))
+    cfg = smtp_config()
+    return bool(cfg["host"] and cfg["username"] and cfg["password"])
 
 
-def send_login_code(email, code):
-    """通过 SMTP 把一次性登录验证码发送到用户邮箱。"""
-    host = app.config["SMTP_HOST"]
-    port = app.config["SMTP_PORT"]
-    username = app.config["SMTP_USERNAME"]
-    password = app.config["SMTP_PASSWORD"]
-    sender = app.config["SMTP_FROM"]
-
+def send_email(to_addr, subject, body):
+    """用当前 SMTP 配置发送一封邮件。465 走隐式 SSL，其余走 STARTTLS。"""
+    cfg = smtp_config()
+    if not (cfg["host"] and cfg["username"] and cfg["password"]):
+        raise RuntimeError("SMTP 未配置")
     msg = EmailMessage()
-    msg["Subject"] = "SIMHUB Web 登录验证码"
-    msg["From"] = sender
-    msg["To"] = email
-    msg.set_content(
-        f"你的 SIMHUB Web 登录验证码是：{code}\n\n"
-        "验证码 5 分钟内有效。如果不是你本人在登录，请忽略本邮件并尽快修改密码。"
-    )
-
-    if port == 465:
+    msg["Subject"] = subject
+    msg["From"] = cfg["sender"] or cfg["username"]
+    msg["To"] = to_addr
+    msg.set_content(body)
+    if cfg["port"] == 465:
         context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(host, port, timeout=15, context=context) as server:
-            if username:
-                server.login(username, password)
+        with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=15, context=context) as server:
+            server.login(cfg["username"], cfg["password"])
             server.send_message(msg)
     else:
-        with smtplib.SMTP(host, port, timeout=15) as server:
+        with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
             server.ehlo()
             if server.has_extn("starttls"):
                 server.starttls(context=ssl.create_default_context())
                 server.ehlo()
-            if username:
-                server.login(username, password)
+            server.login(cfg["username"], cfg["password"])
             server.send_message(msg)
+
+
+def send_login_code(email, code):
+    send_email(
+        email,
+        "SIMHUB Web 登录验证码",
+        f"你的 SIMHUB Web 登录验证码是：{code}\n\n"
+        "验证码 5 分钟内有效。如果不是你本人在登录，请忽略本邮件并尽快修改密码。",
+    )
+
+
+def run_due_reminders():
+    """每天最多跑一次：扫描临近到期的卡片，给每张未发过的卡片寄一封提醒。"""
+    row = get_settings()
+    if not row or not row["reminder_enabled"] or not smtp_configured():
+        return
+    today = date.today().isoformat()
+    if row["last_reminder_date"] == today:
+        return
+    get_db().execute("UPDATE settings SET last_reminder_date = ? WHERE id = 1", (today,))
+    get_db().commit()
+    cfg = smtp_config()
+    recipient = cfg["recipient"]
+    if not recipient:
+        return
+    days_before = max(int(row["reminder_days_before"] or 3), 0)
+    for card in load_cards({}):
+        if card.get("isLongTerm"):
+            continue
+        left = days_left(card)
+        if left is None or left < 0 or left > days_before:
+            continue
+        already = get_db().execute(
+            "SELECT 1 FROM reminder_log WHERE card_id = ? AND sent_date = ?",
+            (card["id"], today),
+        ).fetchone()
+        if already:
+            continue
+        name = card.get("carrier") or "未命名卡片"
+        expiry = (card.get("expiryDate") or "")[:10]
+        try:
+            send_email(
+                recipient,
+                f"SIMHUB 到期提醒：{name} 还有 {left} 天",
+                f"卡片「{name}」（{card.get('countryName','')} {card.get('plan','')}）"
+                f"将于 {expiry} 到期，剩余 {left} 天，请及时续期保号。",
+            )
+        except Exception:
+            continue
+        get_db().execute(
+            "INSERT OR IGNORE INTO reminder_log (card_id, sent_date) VALUES (?, ?)",
+            (card["id"], today),
+        )
+    get_db().commit()
 
 
 def parse_iso(value):
