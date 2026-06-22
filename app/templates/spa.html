@@ -170,7 +170,6 @@ main{padding:22px;max-width:1180px;width:100%}
     <nav class="nav" id="nav">
       <a data-v="overview" class="active">📊 概览</a>
       <a data-v="cards">💳 卡片管理</a>
-      <a data-v="batch">☑️ 批量编辑</a>
       <a data-v="io">📂 导入与导出</a>
       <a data-v="settings">⚙️ 设置</a>
     </nav>
@@ -254,8 +253,8 @@ applyTheme();
 /* 导航 */
 document.getElementById('nav').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;setView(a.dataset.v);document.getElementById('sidebar').classList.remove('open');});
 function setView(v){view=v;document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.v===v));
-  const titles={overview:'概览',cards:'卡片管理',batch:'批量编辑',io:'导入与导出',settings:'设置'};
-  document.getElementById('pageTitle').textContent=titles[v];if(v!=='batch'){selectMode=false;selected.clear();}render();}
+  const titles={overview:'概览',cards:'卡片管理',io:'导入与导出',settings:'设置'};
+  document.getElementById('pageTitle').textContent=titles[v];selectMode=false;selected.clear();render();}
 
 async function enterApp(){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');await loadStatus();await loadCards();}
 async function loadStatus(){try{const s=await api('/api/status');document.getElementById('deviceMeta').textContent=(s.deviceName||'')+' · '+(s.connectedDevices||0)+' 台在线';}catch(e){}}
@@ -263,7 +262,7 @@ async function loadCards(){try{cards=await api('/api/cards')||[];render();}catch
 
 /* 渲染分发 */
 const M=()=>document.getElementById('main');
-function render(){ if(view==='overview')renderOverview(); else if(view==='cards')renderCards(); else if(view==='batch')renderBatch(); else if(view==='io')renderIO(); else renderSettings(); }
+function render(){ if(view==='overview')renderOverview(); else if(view==='cards')renderCards(); else if(view==='io')renderIO(); else renderSettings(); }
 
 function daysLeft(c){return Math.ceil((new Date(c.expiryDate)-new Date())/86400000);}
 function isoNoMillis(d){return d.toISOString().replace(/\.\d{3}Z$/,'Z');}
@@ -325,20 +324,40 @@ function filteredCards(){
 
 function renderCards(){
   const countries=[...new Set(cards.map(c=>c.countryName).filter(Boolean))].sort();
-  M().innerHTML=`
-    <div class="toolbar">
-      <input id="search" placeholder="搜索运营商/国家/号码">
+  const filters=`
       <select id="fCountry"><option value="">全部国家</option>${countries.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <select id="fStatus"><option value="">全部状态</option><option value="active">使用中</option><option value="soon">即将到期</option><option value="exp">已过期</option></select>
-      <select id="fSort"><option value="order">默认排序</option><option value="expiry">按到期</option><option value="carrier">按运营商</option></select>
+      <select id="fSort"><option value="order">默认排序</option><option value="expiry">按到期</option><option value="carrier">按运营商</option></select>`;
+  const toolbar=selectMode?`
+    <div class="toolbar">
+      <input id="search" placeholder="搜索运营商/国家/号码">
+      ${filters}
       <span style="flex:1"></span>
+      <span id="selCount" class="sub"></span>
+      <button class="sec" id="tagBtn">批量打标签</button>
+      <button class="danger" id="delBtn">批量删除</button>
+      <button class="ghost" id="doneBtn">完成</button>
+    </div>`:`
+    <div class="toolbar">
+      <input id="search" placeholder="搜索运营商/国家/号码">
+      ${filters}
+      <span style="flex:1"></span>
+      <button class="sec" id="selBtn">批量编辑</button>
       <button id="newBtn">+ 新建卡片</button>
-    </div>
+    </div>`;
+  M().innerHTML=toolbar+`
     <div id="grid" class="grid"></div>
     <p id="empty" class="sub hidden" style="text-align:center;padding:40px">无符合条件的卡片</p>`;
   ['search','fCountry','fStatus','fSort'].forEach(id=>document.getElementById(id).addEventListener('input',drawGrid));
-  document.getElementById('newBtn').onclick=()=>openDrawer(null);
-  drawGrid();
+  if(selectMode){
+    document.getElementById('tagBtn').onclick=batchTag;
+    document.getElementById('delBtn').onclick=batchDelete;
+    document.getElementById('doneBtn').onclick=()=>{selectMode=false;selected.clear();renderCards();};
+  }else{
+    document.getElementById('selBtn').onclick=()=>{selectMode=true;selected.clear();renderCards();};
+    document.getElementById('newBtn').onclick=()=>openDrawer(null);
+  }
+  drawGrid();updateSel();
 }
 function drawGrid(){
   const list=filteredCards();const grid=document.getElementById('grid');grid.innerHTML=list.map(cardHTML).join('');
@@ -347,34 +366,15 @@ function drawGrid(){
 }
 
 /* 批量 */
-function renderBatch(){
-  selectMode=true;
-  const countries=[...new Set(cards.map(c=>c.countryName).filter(Boolean))].sort();
-  M().innerHTML=`
-    <div class="toolbar">
-      <input id="search" placeholder="搜索">
-      <select id="fCountry"><option value="">全部国家</option>${countries.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
-      <select id="fStatus"><option value="">全部状态</option><option value="active">使用中</option><option value="soon">即将到期</option><option value="exp">已过期</option></select>
-      <select id="fSort"><option value="order">默认排序</option><option value="expiry">按到期</option><option value="carrier">按运营商</option></select>
-      <span style="flex:1"></span>
-      <span id="selCount" class="sub"></span>
-      <button class="sec" id="tagBtn">批量打标签</button>
-      <button class="danger" id="delBtn">批量删除</button>
-    </div>
-    <div id="grid" class="grid"></div>`;
-  ['search','fCountry','fStatus','fSort'].forEach(id=>document.getElementById(id).addEventListener('input',drawGrid));
-  document.getElementById('tagBtn').onclick=batchTag;
-  document.getElementById('delBtn').onclick=batchDelete;
-  drawGrid();updateSel();
-}
+
 function toggleSel(id){if(selected.has(id))selected.delete(id);else selected.add(id);drawGrid();updateSel();}
 function updateSel(){const el=document.getElementById('selCount');if(el)el.textContent='已选 '+selected.size;}
 function batchDelete(){if(!selected.size)return toast('未选择');
   confirmDelete('确定删除选中的 '+selected.size+' 张卡片?此操作无法撤销。',async()=>{
-    try{const r=await api('/api/cards/batch-update',{method:'POST',body:JSON.stringify({ids:[...selected],action:'delete'})});toast('已删除 '+r.deleted+' 张');selected.clear();await loadCards();renderBatch();}catch(e){toast(e.message);}
+    try{const r=await api('/api/cards/batch-update',{method:'POST',body:JSON.stringify({ids:[...selected],action:'delete'})});toast('已删除 '+r.deleted+' 张');selected.clear();await loadCards();renderCards();}catch(e){toast(e.message);}
   },'删除 '+selected.size+' 张');}
 async function batchTag(){if(!selected.size)return toast('未选择');const t=prompt('输入要添加的标签(逗号分隔)');if(!t)return;
-  try{const r=await api('/api/cards/batch-update',{method:'POST',body:JSON.stringify({ids:[...selected],action:'addTags',tags:t.split(',').map(s=>s.trim()).filter(Boolean)})});toast('已更新 '+r.updated+' 张');await loadCards();renderBatch();}catch(e){toast(e.message);}}
+  try{const r=await api('/api/cards/batch-update',{method:'POST',body:JSON.stringify({ids:[...selected],action:'addTags',tags:t.split(',').map(s=>s.trim()).filter(Boolean)})});toast('已更新 '+r.updated+' 张');await loadCards();renderCards();}catch(e){toast(e.message);}}
 
 /* 导入导出 */
 function renderIO(){
