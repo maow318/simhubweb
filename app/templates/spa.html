@@ -162,14 +162,11 @@ main{padding:22px;max-width:1180px;width:100%}
 .subhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .subhead h2{font-size:20px;margin:0;font-weight:600;letter-spacing:-.02em}
 .subhead .iconbtn{width:34px;height:34px}
-.card.hasbg{border:none;color:#fff}
-.card.hasbg h3{color:#fff}
-.card.hasbg .sub{color:rgba(255,255,255,.85)}
-.card.hasbg .row{color:rgba(255,255,255,.82)}
-.card.hasbg .iconbtn{color:rgba(255,255,255,.9)}
-.card.hasbg .flag{text-shadow:0 1px 3px rgba(0,0,0,.45)}
-.card-bg{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0}
-.card-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.66));z-index:1}
+.card.hasbg h3{color:var(--text)}
+.card.hasbg .sub,.card.hasbg .row{color:var(--sub)}
+.card-bg{position:absolute;inset:0;background-size:cover;background-position:center right;z-index:0}
+.card-shade{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,.78) 38%,rgba(255,255,255,.22) 68%,rgba(255,255,255,0) 100%)}
+.dark .card-shade{background:linear-gradient(90deg,rgba(18,18,20,.95) 0%,rgba(18,18,20,.78) 38%,rgba(18,18,20,.24) 68%,rgba(18,18,20,0) 100%)}
 .card.hasbg>*:not(.card-bg):not(.card-shade){position:relative;z-index:2}
 </style>
 </head>
