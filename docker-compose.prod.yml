@@ -1,0 +1,38 @@
+# 生产部署：Caddy 自动签发 Let's Encrypt 证书 + 强制 HTTPS。
+# 用法：
+#   cp .env.example .env   # 填好 SECRET_KEY 和 SIMHUB_DOMAIN
+#   docker compose -f docker-compose.prod.yml up -d --build
+# 前提：SIMHUB_DOMAIN 的 DNS A 记录已指向本服务器，且 80/443 端口可达。
+services:
+  app:
+    build: .
+    container_name: simhub-keeper
+    environment:
+      - SECRET_KEY=${SECRET_KEY:?请在 .env 设置 SECRET_KEY}
+      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      - simhub-data:/data
+    restart: unless-stopped
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2
+    container_name: simhub-caddy
+    environment:
+      - SIMHUB_DOMAIN=${SIMHUB_DOMAIN:?请在 .env 设置 SIMHUB_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    depends_on:
+      - app
+
+volumes:
+  simhub-data:
+  caddy-data:
+  caddy-config:

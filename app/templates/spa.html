@@ -179,6 +179,8 @@ main{padding:22px;max-width:1180px;width:100%}
 .dRow{display:flex;justify-content:space-between;gap:16px;padding:11px 2px;border-bottom:1px solid var(--line);font-size:14px}
 .dRow .dL{color:var(--sub);flex-shrink:0}
 .dRow .dV{text-align:right;word-break:break-all}
+.codeblk{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12px;overflow:auto;white-space:pre;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+code{background:var(--card2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Menlo,monospace}
 .grid:not(.selecting) .selcheck{display:none}
 .grid.selecting .moreBtn{display:none}
 .batchActions{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
@@ -478,11 +480,13 @@ async function commitImport(){
 function renderSettings(){
   if(settingsPage==='security')return renderSettingsSecurity();
   if(settingsPage==='email')return renderSettingsEmail();
+  if(settingsPage==='backup')return renderSettingsBackup();
   const dark=document.body.classList.contains('dark');
   M().innerHTML=`
     <div class="setlist">
       <div class="setRow" data-go="security"><div class="rt"><b>账户安全</b><span>修改登录密码</span></div><span class="chev">›</span></div>
       <div class="setRow" data-go="email"><div class="rt"><b>邮件 / 邮箱验证</b><span>登录两步验证与卡片到期提醒</span></div><span class="chev">›</span></div>
+      <div class="setRow" data-go="backup"><div class="rt"><b>数据备份</b><span>导出 JSON 备份 / 卷备份说明</span></div><span class="chev">›</span></div>
     </div>
     <div class="setlist">
       <label class="setRow"><div class="rt"><b>默认隐藏电话号码</b><span>卡片号码默认打码，点眼睛单独显示</span></div><input type="checkbox" id="maskChk" ${maskDefault?'checked':''}></label>
@@ -511,6 +515,14 @@ function renderSettingsEmail(){
   dG('smSave').onclick=saveSmtp;
   dG('smTest').onclick=testSmtp;
   loadAccount();
+}
+function renderSettingsBackup(){
+  M().innerHTML=settingsHeader('数据备份')+`
+    <div class="panel"><h3>导出备份</h3><p class="sub" style="margin-top:0">把全部卡片导出成 JSON 文件（兼容 App 备份格式）。建议定期导出留存。</p><button id="bkExport">导出 JSON 备份</button></div>
+    <div class="panel"><h3>服务器卷备份</h3><p class="sub" style="margin-top:0">数据库存放在 Docker 卷 <code>simhub-data</code> 里。在服务器上可这样备份整库：</p><pre class="codeblk">docker run --rm -v simhub-data:/data -v $PWD:/backup alpine \\
+  tar czf /backup/simhub-backup-$(date +%Y%m%d).tar.gz -C /data .</pre><p class="sub">恢复时把 tar 解回同名卷即可。</p></div>`;
+  dG('backBtn').onclick=()=>{settingsPage='home';render();};
+  dG('bkExport').onclick=doExport;
 }
 const SMTP_PRESETS={qq:['smtp.qq.com',465],gmail:['smtp.gmail.com',465],'163':['smtp.163.com',465],'126':['smtp.126.com',465]};
 function applyProvider(){const p=dG('smProvider').value;if(SMTP_PRESETS[p]){dG('smHost').value=SMTP_PRESETS[p][0];dG('smPort').value=SMTP_PRESETS[p][1];}}

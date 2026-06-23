@@ -207,10 +207,16 @@ def create_app():
             return redirect(url_for("dashboard"))
         if request.method == "POST":
             validate_csrf()
+            ip = client_ip()
+            remaining = login_lock_remaining(ip)
+            if remaining > 0:
+                flash(f"尝试次数过多，请 {remaining // 60 + 1} 分钟后再试。", "error")
+                return render_template("login.html")
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
             user = get_db().execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
             if user and check_password_hash(user["password_hash"], password):
+                clear_login_fails(ip)
                 settings_row = get_settings()
                 two_fa = settings_row and settings_row["twofa_enabled"] and smtp_configured()
                 email = smtp_config()["recipient"] if two_fa else None
@@ -237,6 +243,7 @@ def create_app():
                 session["csrf_token"] = secrets.token_urlsafe(32)
                 flash("登录成功。", "success")
                 return redirect(url_for("dashboard"))
+            record_login_fail(ip)
             flash("用户名或密码错误。", "error")
         return render_template("login.html")
 
@@ -742,6 +749,42 @@ def validate_csrf():
 
 def now_iso():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+# --- 登录限流（内存级，防暴力破解）---
+LOGIN_MAX_FAILS = 5
+LOGIN_WINDOW = 900  # 15 分钟
+_login_fails = {}
+
+
+def client_ip():
+    """取真实客户端 IP（在 Caddy/nginx 反代后用 X-Forwarded-For 首段）。"""
+    fwd = request.headers.get("X-Forwarded-For", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def login_lock_remaining(ip):
+    """返回该 IP 还需冷却的秒数；0 表示未锁定。"""
+    import time
+
+    now = time.time()
+    fails = [t for t in _login_fails.get(ip, []) if now - t < LOGIN_WINDOW]
+    _login_fails[ip] = fails
+    if len(fails) >= LOGIN_MAX_FAILS:
+        return int(LOGIN_WINDOW - (now - fails[0]))
+    return 0
+
+
+def record_login_fail(ip):
+    import time
+
+    _login_fails.setdefault(ip, []).append(time.time())
+
+
+def clear_login_fails(ip):
+    _login_fails.pop(ip, None)
 
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
