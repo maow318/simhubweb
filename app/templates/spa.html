@@ -9,7 +9,6 @@
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SIMHUB">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 :root{
   --bg:#f2f2f7; --card:#ffffff; --card2:#fbfbfd; --text:#1d1d1f; --sub:#86868b; --line:#e5e5ea;
@@ -193,7 +192,6 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:5px;padd
 .scrim.center{justify-content:center;align-items:center}
 .modalBox{background:var(--bg);width:min(560px,94vw);max-height:88vh;overflow:auto;border-radius:18px;padding:22px;animation:pop .2s ease}
 @keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}
-.chartwrap{position:relative;height:220px}
 .tagcloud{display:flex;flex-wrap:wrap;gap:8px}
 .tagcloud .tc{background:var(--accent-weak);color:var(--accent);border-radius:20px;padding:3px 11px;font-weight:600;line-height:1.6}
 .acts{display:flex;flex-direction:column}
@@ -266,7 +264,7 @@ document.querySelectorAll(".logo").forEach(e=>{e.textContent="";const i=document
 let token=sessionStorage.getItem('simhub_token')||'';
 let cards=[]; let view='overview'; let revealed=new Set(); let selectMode=false; let selected=new Set(); let settingsPage='home';
 let cardEls={}; let gridEl=null; let emptyEl=null;
-let filterTags=new Set(); let filterFrom=''; let filterTo=''; let advOpen=false; let _trendChart=null;
+let filterTags=new Set(); let filterFrom=''; let filterTo=''; let advOpen=false;
 let maskDefault = localStorage.getItem('simhub_mask')!=='off';
 const EYE='<svg><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF='<svg><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
@@ -350,22 +348,10 @@ function renderOverview(){
       <div class="stat danger"><div class="n">${exp}</div><div class="l">已过期</div></div>
       <div class="stat"><div class="n">●</div><div class="l">服务运行中</div></div>
     </div>
-    <div class="panel"><h3>未来 6 个月到期趋势</h3><div class="chartwrap"><canvas id="trendChart"></canvas></div></div>
     <div class="panel"><h3>国家 / 地区分布</h3>${top.map(([k,v])=>`<div class="bar"><span style="width:90px">${esc(k)}</span><div class="track"><div class="fill" style="width:${v/max*100}%"></div></div><span>${v}</span></div>`).join('')||'<span class="sub">暂无数据</span>'}</div>
     <div class="panel"><h3>最近修改</h3>${recent.map(c=>`<div class="recent"><span>${c.flag||'🌐'} ${esc(c.carrier||'未命名')}</span><span class="sub">${c.updatedAt?new Date(c.updatedAt).toLocaleString():''}</span></div>`).join('')||'<span class="sub">暂无</span>'}</div>
     <div class="panel"><h3>最近活动</h3><div class="acts" id="actList"><span class="sub">加载中…</span></div></div>`;
-  drawTrendChart();loadActivity();
-}
-function drawTrendChart(){
-  if(typeof Chart==='undefined')return;const cv=dG('trendChart');if(!cv)return;
-  const now=new Date();const labels=[],counts=[];
-  for(let i=0;i<6;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1);labels.push((d.getMonth()+1)+'月');
-    counts.push(cards.filter(c=>{const e=new Date(c.expiryDate);return e.getFullYear()===d.getFullYear()&&e.getMonth()===d.getMonth();}).length);}
-  if(_trendChart){_trendChart.destroy();_trendChart=null;}
-  const css=getComputedStyle(document.body);const accent=css.getPropertyValue('--accent').trim()||'#0a84ff';const sub=css.getPropertyValue('--sub').trim()||'#888';
-  _trendChart=new Chart(cv,{type:'bar',data:{labels,datasets:[{data:counts,backgroundColor:accent,borderRadius:6,maxBarThickness:46}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{x:{grid:{display:false},ticks:{color:sub}},y:{beginAtZero:true,ticks:{precision:0,color:sub},grid:{color:'rgba(128,128,128,.12)'}}}}});
+  loadActivity();
 }
 function fmtTime(s){if(!s)return '';let d=new Date(s.replace(' ','T')+(/[zZ]$/.test(s)?'':'Z'));return isNaN(d)?s:d.toLocaleString();}
 async function loadActivity(){
