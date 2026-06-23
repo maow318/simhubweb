@@ -162,7 +162,7 @@ def create_app():
     def before_request():
         init_db()
         g.user = current_user()
-        public_endpoints = {"setup", "login", "login_code", "static", "api_status", "manifest", "service_worker"}
+        public_endpoints = {"setup", "login", "login_code", "static", "api_status", "manifest", "service_worker", "telegram_webhook"}
         if user_count() == 0 and request.endpoint not in public_endpoints:
             if request.path.startswith("/api/"):
                 return api_fail("请先创建管理员", "SETUP_REQUIRED", 403)
@@ -218,14 +218,20 @@ def create_app():
             if user and check_password_hash(user["password_hash"], password):
                 clear_login_fails(ip)
                 settings_row = get_settings()
-                two_fa = settings_row and settings_row["twofa_enabled"] and smtp_configured()
-                email = smtp_config()["recipient"] if two_fa else None
-                if two_fa and email:
+                method = (settings_row["twofa_method"] if settings_row else "email") or "email"
+                channel_ok = tg_configured() if method == "telegram" else smtp_configured()
+                two_fa = bool(settings_row and settings_row["twofa_enabled"] and channel_ok)
+                if two_fa:
                     code = f"{secrets.randbelow(1000000):06d}"
                     try:
-                        send_login_code(email, code)
+                        if method == "telegram":
+                            tg_send(f"SIMHUB 登录验证码：{code}\n5 分钟内有效。非本人操作请忽略。")
+                            target = "Telegram"
+                        else:
+                            send_login_code(smtp_config()["recipient"], code)
+                            target = mask_email(smtp_config()["recipient"])
                     except Exception:
-                        flash("验证码邮件发送失败，请检查 SMTP 配置。", "error")
+                        flash("验证码发送失败，请检查验证方式配置。", "error")
                         return render_template("login.html")
                     session.clear()
                     session["csrf_token"] = secrets.token_urlsafe(32)
@@ -233,10 +239,10 @@ def create_app():
                         "uid": user["id"],
                         "code_hash": hash_password(code),
                         "expires": (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat(),
-                        "email": mask_email(email),
+                        "email": target,
                         "tries": 0,
                     }
-                    flash("验证码已发送到你的邮箱。", "success")
+                    flash(f"验证码已发送到 {target}。", "success")
                     return redirect(url_for("login_code"))
                 session.clear()
                 session["user_id"] = user["id"]
@@ -668,9 +674,11 @@ self.addEventListener('fetch',e=>{
                 "hasPassword": bool(row["smtp_password"]),
                 "recipient": row["recipient"],
                 "twofaEnabled": bool(row["twofa_enabled"]),
+                "twofaMethod": row["twofa_method"] or "email",
                 "reminderEnabled": bool(row["reminder_enabled"]),
                 "reminderDaysBefore": row["reminder_days_before"],
                 "ready": smtp_configured(),
+                "tgReady": tg_configured(),
             }
         )
 
@@ -696,9 +704,10 @@ self.addEventListener('fetch',e=>{
             enc = row["smtp_password"]
         else:
             enc = encrypt_secret(password.strip())
+        method = "telegram" if body.get("twofaMethod") == "telegram" else "email"
         get_db().execute(
             """UPDATE settings SET smtp_host=?, smtp_port=?, smtp_username=?, smtp_password=?,
-               recipient=?, twofa_enabled=?, reminder_enabled=?, reminder_days_before=? WHERE id=1""",
+               recipient=?, twofa_enabled=?, twofa_method=?, reminder_enabled=?, reminder_days_before=? WHERE id=1""",
             (
                 host,
                 port,
@@ -706,6 +715,7 @@ self.addEventListener('fetch',e=>{
                 enc,
                 recipient,
                 1 if body.get("twofaEnabled") else 0,
+                method,
                 1 if body.get("reminderEnabled") else 0,
                 max(int(body.get("reminderDaysBefore") or 3), 0),
             ),
@@ -729,6 +739,97 @@ self.addEventListener('fetch',e=>{
         except Exception as exc:
             return api_fail(f"发送失败：{exc}", "SEND_FAILED", 502)
         return api_ok({"sent": True, "to": mask_email(target)})
+
+    @app.route("/api/tg")
+    @login_required
+    def api_tg_get():
+        row = get_settings()
+        return api_ok(
+            {
+                "enabled": bool(row["tg_enabled"]),
+                "hasToken": bool(row["tg_token"]),
+                "chatId": row["tg_chat_id"],
+                "reminderEnabled": bool(row["tg_reminder_enabled"]),
+                "daysBefore": row["tg_days_before"],
+                "ready": tg_configured(),
+                "webhookSet": bool(row["tg_chat_id"] and row["tg_token"]),
+            }
+        )
+
+    @app.route("/api/tg", methods=["POST"])
+    @login_required
+    def api_tg_save():
+        body = request.get_json(silent=True) or {}
+        row = get_settings()
+        token_in = body.get("token")
+        enc = row["tg_token"] if (token_in is None or token_in == "") else encrypt_secret(token_in.strip())
+        get_db().execute(
+            """UPDATE settings SET tg_enabled=?, tg_token=?, tg_chat_id=?,
+               tg_reminder_enabled=?, tg_days_before=? WHERE id=1""",
+            (
+                1 if body.get("enabled") else 0,
+                enc,
+                (body.get("chatId") or "").strip(),
+                1 if body.get("reminderEnabled") else 0,
+                max(int(body.get("daysBefore") or 3), 0),
+            ),
+        )
+        get_db().commit()
+        # 配置就绪则自动注册 webhook（用于交互式命令）
+        if tg_configured():
+            try:
+                set_telegram_webhook()
+            except Exception:
+                pass
+        return api_ok({"ready": tg_configured()})
+
+    @app.route("/api/tg/chatid", methods=["POST"])
+    @login_required
+    def api_tg_chatid():
+        body = request.get_json(silent=True) or {}
+        token = (body.get("token") or "").strip()
+        if not token:
+            row = get_settings()
+            token = decrypt_secret(row["tg_token"]) if row["tg_token"] else ""
+        if not token:
+            return api_fail("请先填写 Bot Token", "NO_TOKEN", 400)
+        try:
+            chat = tg_get_chat_id(token)
+        except Exception as exc:
+            return api_fail(f"获取失败：{exc}", "FETCH_FAILED", 502)
+        if not chat:
+            return api_fail("没拿到 Chat ID，请先在 Telegram 给你的 Bot 发一条消息再试", "NO_CHAT", 404)
+        return api_ok({"chatId": chat})
+
+    @app.route("/api/tg/test", methods=["POST"])
+    @login_required
+    def api_tg_test():
+        try:
+            tg_send("✅ 这是一条来自 SIMHUB Web 的测试消息，收到说明配置正确。")
+        except Exception as exc:
+            return api_fail(f"发送失败：{exc}", "SEND_FAILED", 502)
+        return api_ok({"sent": True})
+
+    @app.route("/api/telegram/webhook", methods=["POST"])
+    def telegram_webhook():
+        # 校验密钥头，拒绝非 Telegram 来源
+        if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != telegram_webhook_secret():
+            return ("", 403)
+        update = request.get_json(silent=True) or {}
+        msg = update.get("message") or update.get("edited_message") or {}
+        chat = msg.get("chat") or {}
+        text = (msg.get("text") or "").strip()
+        cfg = tg_config()
+        # 只响应配置的 Chat ID
+        if not cfg["chat_id"] or str(chat.get("id")) != str(cfg["chat_id"]):
+            return ("", 200)
+        try:
+            reply = handle_tg_command(text)
+            if reply:
+                tg_send(reply, chat_id=str(chat.get("id")))
+        except Exception:
+            pass
+        return ("", 200)
 
     @app.teardown_appcontext
     def close_db(_error):
@@ -784,6 +885,32 @@ def init_db():
     columns = {row["name"] for row in get_db().execute("PRAGMA table_info(users)")}
     if "email" not in columns:
         get_db().execute("ALTER TABLE users ADD COLUMN email TEXT")
+    # 迁移 settings：补 Telegram / 2FA 方式相关列
+    scols = {row["name"] for row in get_db().execute("PRAGMA table_info(settings)")}
+    _add = [
+        ("twofa_method", "TEXT NOT NULL DEFAULT 'email'"),
+        ("tg_enabled", "INTEGER NOT NULL DEFAULT 0"),
+        ("tg_token", "TEXT NOT NULL DEFAULT ''"),
+        ("tg_chat_id", "TEXT NOT NULL DEFAULT ''"),
+        ("tg_reminder_enabled", "INTEGER NOT NULL DEFAULT 0"),
+        ("tg_days_before", "INTEGER NOT NULL DEFAULT 3"),
+    ]
+    for col, decl in _add:
+        if col not in scols:
+            get_db().execute(f"ALTER TABLE settings ADD COLUMN {col} {decl}")
+    # 迁移 reminder_log：去重键加入 channel（区分邮件 / Telegram）
+    rcols = {row["name"] for row in get_db().execute("PRAGMA table_info(reminder_log)")}
+    if rcols and "channel" not in rcols:
+        get_db().executescript(
+            """
+            CREATE TABLE reminder_log_new (card_id TEXT NOT NULL, sent_date TEXT NOT NULL,
+                channel TEXT NOT NULL DEFAULT 'email', PRIMARY KEY (card_id, sent_date, channel));
+            INSERT OR IGNORE INTO reminder_log_new (card_id, sent_date, channel)
+                SELECT card_id, sent_date, 'email' FROM reminder_log;
+            DROP TABLE reminder_log;
+            ALTER TABLE reminder_log_new RENAME TO reminder_log;
+            """
+        )
     # 迁移 activity_log：去掉会随删卡级联清空的外键，加 card_label 留存卡名
     acols = {row["name"] for row in get_db().execute("PRAGMA table_info(activity_log)")}
     if acols and "card_label" not in acols:
@@ -988,48 +1115,188 @@ def send_login_code(email, code):
     )
 
 
-def run_due_reminders():
-    """每天最多跑一次：扫描临近到期的卡片，给每张未发过的卡片寄一封提醒。"""
+def tg_config():
     row = get_settings()
-    if not row or not row["reminder_enabled"] or not smtp_configured():
+    token = decrypt_secret(row["tg_token"]) if row and row["tg_token"] else ""
+    return {
+        "token": token,
+        "chat_id": (row["tg_chat_id"] if row else "") or "",
+    }
+
+
+def tg_configured():
+    cfg = tg_config()
+    return bool(cfg["token"] and cfg["chat_id"])
+
+
+def tg_send(text, chat_id=None):
+    """通过 Telegram Bot API 发送一条消息。"""
+    cfg = tg_config()
+    token = cfg["token"]
+    chat = chat_id or cfg["chat_id"]
+    if not (token and chat):
+        raise RuntimeError("Telegram 未配置")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = json.dumps({"chat_id": chat, "text": text, "disable_web_page_preview": True}).encode()
+    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+    if not body.get("ok"):
+        raise RuntimeError(body.get("description") or "Telegram 发送失败")
+
+
+def telegram_webhook_secret():
+    return hashlib.sha256((app.config["SECRET_KEY"] + ":tgwebhook").encode()).hexdigest()[:40]
+
+
+def set_telegram_webhook():
+    """把 webhook 指到本站，用于接收 Telegram 命令。需在请求上下文中调用（取公网地址）。"""
+    cfg = tg_config()
+    if not cfg["token"]:
+        return
+    proto = request.headers.get("X-Forwarded-Proto") or request.scheme
+    host = request.headers.get("X-Forwarded-Host") or request.host
+    url = f"{proto}://{host}/api/telegram/webhook"
+    api = f"https://api.telegram.org/bot{cfg['token']}/setWebhook"
+    payload = json.dumps(
+        {"url": url, "secret_token": telegram_webhook_secret(), "allowed_updates": ["message"]}
+    ).encode()
+    req = urllib.request.Request(api, data=payload, headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(req, timeout=15).read()
+
+
+def handle_tg_command(text):
+    """解析 Telegram 命令（支持中文），返回回复文本。"""
+    t = (text or "").strip()
+    low = t.lower()
+    cmd = low.lstrip("/").split("@")[0]
+
+    def fmt_left(card):
+        d = days_left(card)
+        if d is None:
+            return ""
+        return f"已过期 {-d} 天" if d < 0 else f"剩 {d} 天"
+
+    if t in ("", "/start", "/help", "帮助", "help", "menu", "菜单"):
+        return (
+            "SIMHUB 机器人命令：\n"
+            "• /list 或「列表」「卡片」— 全部卡片\n"
+            "• /expiring 或「快到期」「到期」— 临近到期的卡片\n"
+            "• /card 名称 或「查 名称」— 查看某张卡详情"
+        )
+    cards = load_cards({})
+    if cmd in ("list", "cards") or t in ("列表", "卡片", "全部", "所有卡片"):
+        if not cards:
+            return "暂无卡片。"
+        lines = [
+            f"{c.get('flag','🌐')} {c.get('carrier') or '未命名'} · {c.get('countryName','')} · {(c.get('expiryDate') or '')[:10]}（{fmt_left(c)}）"
+            for c in cards
+        ]
+        return "共 %d 张卡片：\n" % len(cards) + "\n".join(lines[:50])
+    if cmd in ("expiring", "due") or t in ("快到期", "到期", "提醒", "即将到期"):
+        soon = [c for c in cards if (days_left(c) is not None and 0 <= days_left(c) <= 30 and not c.get("isLongTerm"))]
+        soon.sort(key=lambda c: days_left(c))
+        if not soon:
+            return "30 天内没有即将到期的卡片。"
+        lines = [f"{c.get('flag','🌐')} {c.get('carrier') or '未命名'} · {(c.get('expiryDate') or '')[:10]}（{fmt_left(c)}）" for c in soon]
+        return "即将到期：\n" + "\n".join(lines[:50])
+    # 查某张卡：/card 名称 或 查 名称
+    keyword = ""
+    if cmd.startswith("card"):
+        keyword = t.split(None, 1)[1].strip() if len(t.split(None, 1)) > 1 else ""
+    elif t.startswith("查"):
+        keyword = t[1:].strip()
+    if keyword:
+        kw = keyword.lower()
+        match = [c for c in cards if kw in (c.get("carrier") or "").lower() or kw in (c.get("countryName") or "").lower()]
+        if not match:
+            return f"没找到包含「{keyword}」的卡片。"
+        c = match[0]
+        parts = [
+            f"{c.get('flag','🌐')} {c.get('carrier') or '未命名'}",
+            f"国家/地区：{c.get('countryName','')}",
+            f"套餐：{c.get('plan','')}" if c.get("plan") else "",
+            f"号码：{c.get('phoneNumber','')}" if c.get("phoneNumber") else "",
+            f"到期：{(c.get('expiryDate') or '')[:10]}（{fmt_left(c)}）",
+            f"SM-DP+：{c.get('smdpAddress','')}" if c.get("smdpAddress") else "",
+            f"激活码：{c.get('activationCode','')}" if c.get("activationCode") else "",
+            f"EID：{c.get('eid','')}" if c.get("eid") else "",
+            f"标签：{'、'.join(c.get('tags') or [])}" if c.get("tags") else "",
+        ]
+        return "\n".join(p for p in parts if p)
+    return "未识别的命令。发送「帮助」查看可用命令。"
+
+
+def tg_get_chat_id(token):
+    """从 getUpdates 取最近一次和 Bot 对话的 chat.id。"""
+    url = f"https://api.telegram.org/bot{token}/getUpdates"
+    req = urllib.request.Request(url, headers={"User-Agent": "simhub"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+    if not body.get("ok"):
+        raise RuntimeError(body.get("description") or "getUpdates 失败")
+    for upd in reversed(body.get("result", [])):
+        msg = upd.get("message") or upd.get("edited_message") or {}
+        chat = msg.get("chat") or {}
+        if chat.get("id") is not None:
+            return str(chat["id"])
+    return ""
+
+
+def run_due_reminders():
+    """每天最多跑一次：扫描临近到期卡片，按启用的渠道（邮件 / Telegram）各自提醒，每卡每渠道每天一次。"""
+    row = get_settings()
+    if not row:
+        return
+    email_on = row["reminder_enabled"] and smtp_configured()
+    tg_on = row["tg_enabled"] and row["tg_reminder_enabled"] and tg_configured()
+    if not (email_on or tg_on):
         return
     today = date.today().isoformat()
     if row["last_reminder_date"] == today:
         return
     get_db().execute("UPDATE settings SET last_reminder_date = ? WHERE id = 1", (today,))
     get_db().commit()
-    cfg = smtp_config()
-    recipient = cfg["recipient"]
-    if not recipient:
-        return
-    days_before = max(int(row["reminder_days_before"] or 3), 0)
+
+    channels = []
+    if email_on:
+        channels.append(("email", max(int(row["reminder_days_before"] or 3), 0)))
+    if tg_on:
+        channels.append(("telegram", max(int(row["tg_days_before"] or 3), 0)))
+    recipient = smtp_config()["recipient"]
+
     for card in load_cards({}):
         if card.get("isLongTerm"):
             continue
         left = days_left(card)
-        if left is None or left < 0 or left > days_before:
-            continue
-        already = get_db().execute(
-            "SELECT 1 FROM reminder_log WHERE card_id = ? AND sent_date = ?",
-            (card["id"], today),
-        ).fetchone()
-        if already:
+        if left is None or left < 0:
             continue
         name = card.get("carrier") or "未命名卡片"
         expiry = (card.get("expiryDate") or "")[:10]
-        try:
-            send_email(
-                recipient,
-                f"SIMHUB 到期提醒：{name} 还有 {left} 天",
-                f"卡片「{name}」（{card.get('countryName','')} {card.get('plan','')}）"
-                f"将于 {expiry} 到期，剩余 {left} 天，请及时续期保号。",
-            )
-        except Exception:
-            continue
-        get_db().execute(
-            "INSERT OR IGNORE INTO reminder_log (card_id, sent_date) VALUES (?, ?)",
-            (card["id"], today),
+        text = (
+            f"SIMHUB 到期提醒：卡片「{name}」（{card.get('countryName','')} {card.get('plan','')}）"
+            f"将于 {expiry} 到期，剩余 {left} 天，请及时续期保号。"
         )
+        for channel, window in channels:
+            if left > window:
+                continue
+            already = get_db().execute(
+                "SELECT 1 FROM reminder_log WHERE card_id = ? AND sent_date = ? AND channel = ?",
+                (card["id"], today, channel),
+            ).fetchone()
+            if already:
+                continue
+            try:
+                if channel == "email":
+                    send_email(recipient, f"SIMHUB 到期提醒：{name} 还有 {left} 天", text)
+                else:
+                    tg_send(text)
+            except Exception:
+                continue
+            get_db().execute(
+                "INSERT OR IGNORE INTO reminder_log (card_id, sent_date, channel) VALUES (?, ?, ?)",
+                (card["id"], today, channel),
+            )
     get_db().commit()
 
 

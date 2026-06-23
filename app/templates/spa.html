@@ -542,11 +542,13 @@ function renderSettings(){
   if(settingsPage==='security')return renderSettingsSecurity();
   if(settingsPage==='email')return renderSettingsEmail();
   if(settingsPage==='backup')return renderSettingsBackup();
+  if(settingsPage==='telegram')return renderSettingsTelegram();
   const dark=document.body.classList.contains('dark');
   M().innerHTML=`
     <div class="setlist">
       <div class="setRow" data-go="security"><div class="rt"><b>账户安全</b><span>修改登录密码</span></div><span class="chev">›</span></div>
       <div class="setRow" data-go="email"><div class="rt"><b>邮件 / 邮箱验证</b><span>登录两步验证与卡片到期提醒</span></div><span class="chev">›</span></div>
+      <div class="setRow" data-go="telegram"><div class="rt"><b>Telegram 通知</b><span>机器人推送、查卡、可作登录验证</span></div><span class="chev">›</span></div>
       <div class="setRow" data-go="backup"><div class="rt"><b>数据备份</b><span>导出 JSON 备份 / 卷备份说明</span></div><span class="chev">›</span></div>
     </div>
     <div class="setlist">
@@ -570,13 +572,45 @@ function renderSettingsSecurity(){
 }
 function renderSettingsEmail(){
   M().innerHTML=settingsHeader('邮件 / 邮箱验证')+`
-    <div class="panel"><p class="sub" id="smtpHint" style="margin-top:0">填好发信邮箱后，可开启登录两步验证与卡片到期提醒。</p><div class="field"><label>信箱服务商</label><select id="smProvider"><option value="qq">QQ邮箱</option><option value="gmail">Gmail</option><option value="163">网易163</option><option value="126">网易126</option><option value="custom">自订</option></select></div><div class="field"><label>SMTP 服务器 / 端口</label><div class="two"><input id="smHost" placeholder="smtp.example.com"><input id="smPort" style="max-width:96px" inputmode="numeric"></div></div><div class="field"><label>发信邮箱地址</label><input id="smUser" type="email" placeholder="you@example.com"></div><div class="field"><label>授权码 / 应用专用密码</label><input id="smPass" type="password" placeholder="授权码 / 应用专用密码"></div><p class="sub" style="margin:-4px 0 0">不是邮箱登录密码：QQ / 网易在邮箱设置里开启 SMTP 取得「授权码」；Gmail 使用「应用专用密码」。</p><div class="field" style="margin-top:13px"><label>收件邮箱（留空＝发给自己）</label><input id="smRcpt" type="email" placeholder="留空则发到发信邮箱"></div><div class="field"><label class="ltrow"><span>登录两步验证</span><input type="checkbox" id="smTwofa"></label></div><div class="field"><label class="ltrow"><span>卡片到期提醒邮件</span><input type="checkbox" id="smRemind"></label></div><div class="field"><label>提前几天提醒</label><input id="smDays" style="max-width:96px" inputmode="numeric" value="3"></div><div class="drawerActions"><button id="smSave" style="flex:1">保存</button><button class="sec" id="smTest">寄送测试邮件</button></div></div>`;
+    <div class="panel"><p class="sub" id="smtpHint" style="margin-top:0">填好发信邮箱后，可开启登录两步验证与卡片到期提醒。</p><div class="field"><label>信箱服务商</label><select id="smProvider"><option value="qq">QQ邮箱</option><option value="gmail">Gmail</option><option value="163">网易163</option><option value="126">网易126</option><option value="custom">自订</option></select></div><div class="field"><label>SMTP 服务器 / 端口</label><div class="two"><input id="smHost" placeholder="smtp.example.com"><input id="smPort" style="max-width:96px" inputmode="numeric"></div></div><div class="field"><label>发信邮箱地址</label><input id="smUser" type="email" placeholder="you@example.com"></div><div class="field"><label>授权码 / 应用专用密码</label><input id="smPass" type="password" placeholder="授权码 / 应用专用密码"></div><p class="sub" style="margin:-4px 0 0">不是邮箱登录密码：QQ / 网易在邮箱设置里开启 SMTP 取得「授权码」；Gmail 使用「应用专用密码」。</p><div class="field" style="margin-top:13px"><label>收件邮箱（留空＝发给自己）</label><input id="smRcpt" type="email" placeholder="留空则发到发信邮箱"></div><div class="field"><label class="ltrow"><span>登录两步验证</span><input type="checkbox" id="smTwofa"></label></div><div class="field"><label>验证码通过</label><select id="smTwofaMethod"><option value="email">邮箱</option><option value="telegram">Telegram</option></select></div><div class="field"><label class="ltrow"><span>卡片到期提醒邮件</span><input type="checkbox" id="smRemind"></label></div><div class="field"><label>提前几天提醒</label><input id="smDays" style="max-width:96px" inputmode="numeric" value="3"></div><div class="drawerActions"><button id="smSave" style="flex:1">保存</button><button class="sec" id="smTest">寄送测试邮件</button></div></div>`;
   dG('backBtn').onclick=()=>{settingsPage='home';render();};
   dG('smProvider').onchange=applyProvider;
   dG('smSave').onclick=saveSmtp;
   dG('smTest').onclick=testSmtp;
   loadAccount();
 }
+function renderSettingsTelegram(){
+  M().innerHTML=settingsHeader('Telegram 通知')+`
+    <div class="panel">
+      <p class="sub" style="margin-top:0">用 Telegram Bot 推送到期提醒，也可作为登录两步验证方式，可和邮件同时开。</p>
+      <div class="field"><label class="ltrow"><span>启用 Telegram</span><input type="checkbox" id="tgEnabled"></label></div>
+      <div class="field"><label>Bot Token</label><input id="tgToken" type="password" placeholder="Bot Token"></div>
+      <div class="field"><label>Chat ID</label><div class="two"><input id="tgChat" placeholder="Chat ID"><button class="sec" id="tgGetChat" style="white-space:nowrap">自动获取</button></div></div>
+      <p class="sub" style="margin:-4px 0 0">先在 Telegram 给你的 Bot 发任意一条消息，再点「自动获取」。Token 在 @BotFather 用 /newbot 创建。</p>
+      <div class="field" style="margin-top:13px"><label class="ltrow"><span>卡片到期提醒</span><input type="checkbox" id="tgRemind"></label></div>
+      <div class="field"><label>提前几天提醒</label><input id="tgDays" style="max-width:96px" inputmode="numeric" value="3"></div>
+      <div class="drawerActions"><button id="tgSave" style="flex:1">保存</button><button class="sec" id="tgTest">发送测试消息</button></div>
+    </div>
+    <div class="panel"><h3>机器人命令（保存后可在 Telegram 直接发）</h3><div class="codeblk">列表 / /list — 全部卡片
+快到期 / /expiring — 临近到期
+查 名称 / /card 名称 — 某张卡详情</div></div>`;
+  dG('backBtn').onclick=()=>{settingsPage='home';render();};
+  dG('tgGetChat').onclick=getChatId;
+  dG('tgSave').onclick=saveTg;
+  dG('tgTest').onclick=testTg;
+  loadTg();
+}
+async function loadTg(){
+  try{const a=await api('/api/tg');
+    dG('tgEnabled').checked=a.enabled;dG('tgChat').value=a.chatId||'';
+    dG('tgToken').value='';dG('tgToken').placeholder=a.hasToken?'已保存，留空表示不修改':'Bot Token';
+    dG('tgRemind').checked=a.reminderEnabled;dG('tgDays').value=a.daysBefore||3;
+  }catch(e){}
+}
+function tgBody(){const b={enabled:dG('tgEnabled').checked,chatId:dG('tgChat').value.trim(),reminderEnabled:dG('tgRemind').checked,daysBefore:parseInt(dG('tgDays').value)||3};const tk=dG('tgToken').value;if(tk)b.token=tk;return b;}
+async function saveTg(){try{await api('/api/tg',{method:'POST',body:JSON.stringify(tgBody())});dG('tgToken').value='';toast('已保存');loadTg();}catch(e){toast(e.message||'保存失败');}}
+async function getChatId(){try{const tk=dG('tgToken').value.trim();const r=await api('/api/tg/chatid',{method:'POST',body:JSON.stringify(tk?{token:tk}:{})});dG('tgChat').value=r.chatId;toast('已获取 Chat ID');}catch(e){toast(e.message||'获取失败');}}
+async function testTg(){try{await api('/api/tg',{method:'POST',body:JSON.stringify(tgBody())});dG('tgToken').value='';await api('/api/tg/test',{method:'POST'});toast('测试消息已发送');loadTg();}catch(e){toast(e.message||'发送失败');}}
 function renderSettingsBackup(){
   M().innerHTML=settingsHeader('数据备份')+`
     <div class="panel"><h3>导出备份</h3><p class="sub" style="margin-top:0">把全部卡片导出成 JSON 文件（兼容 App 备份格式）。建议定期导出留存。</p><button id="bkExport">导出 JSON 备份</button></div>
@@ -587,13 +621,13 @@ function renderSettingsBackup(){
 }
 const SMTP_PRESETS={qq:['smtp.qq.com',465],gmail:['smtp.gmail.com',465],'163':['smtp.163.com',465],'126':['smtp.126.com',465]};
 function applyProvider(){const p=dG('smProvider').value;if(SMTP_PRESETS[p]){dG('smHost').value=SMTP_PRESETS[p][0];dG('smPort').value=SMTP_PRESETS[p][1];}}
-function smtpBody(){const b={host:dG('smHost').value.trim(),port:parseInt(dG('smPort').value)||465,username:dG('smUser').value.trim(),recipient:dG('smRcpt').value.trim(),twofaEnabled:dG('smTwofa').checked,reminderEnabled:dG('smRemind').checked,reminderDaysBefore:parseInt(dG('smDays').value)||3};const pw=dG('smPass').value;if(pw)b.password=pw;return b;}
+function smtpBody(){const b={host:dG('smHost').value.trim(),port:parseInt(dG('smPort').value)||465,username:dG('smUser').value.trim(),recipient:dG('smRcpt').value.trim(),twofaEnabled:dG('smTwofa').checked,reminderEnabled:dG('smRemind').checked,reminderDaysBefore:parseInt(dG('smDays').value)||3,twofaMethod:(dG('smTwofaMethod')||{}).value||'email'};const pw=dG('smPass').value;if(pw)b.password=pw;return b;}
 async function loadAccount(){
   try{const a=await api('/api/smtp');
     dG('smHost').value=a.host||'';dG('smPort').value=a.port||465;
     dG('smUser').value=a.username||'';dG('smRcpt').value=a.recipient||'';
     dG('smPass').value='';dG('smPass').placeholder=a.hasPassword?'已保存，留空表示不修改':'授权码 / 应用专用密码';
-    dG('smTwofa').checked=a.twofaEnabled;dG('smRemind').checked=a.reminderEnabled;dG('smDays').value=a.reminderDaysBefore||3;
+    dG('smTwofa').checked=a.twofaEnabled;dG('smRemind').checked=a.reminderEnabled;dG('smDays').value=a.reminderDaysBefore||3;if(dG('smTwofaMethod'))dG('smTwofaMethod').value=a.twofaMethod||'email';
     let prov='custom';for(const k in SMTP_PRESETS){if(SMTP_PRESETS[k][0]===a.host)prov=k;}dG('smProvider').value=prov;
   }catch(e){}
 }

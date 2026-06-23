@@ -65,9 +65,15 @@ CREATE TABLE IF NOT EXISTS settings (
     smtp_password TEXT NOT NULL DEFAULT '',
     recipient TEXT NOT NULL DEFAULT '',
     twofa_enabled INTEGER NOT NULL DEFAULT 0,
+    twofa_method TEXT NOT NULL DEFAULT 'email',
     reminder_enabled INTEGER NOT NULL DEFAULT 0,
     reminder_days_before INTEGER NOT NULL DEFAULT 3,
-    last_reminder_date TEXT NOT NULL DEFAULT ''
+    last_reminder_date TEXT NOT NULL DEFAULT '',
+    tg_enabled INTEGER NOT NULL DEFAULT 0,
+    tg_token TEXT NOT NULL DEFAULT '',
+    tg_chat_id TEXT NOT NULL DEFAULT '',
+    tg_reminder_enabled INTEGER NOT NULL DEFAULT 0,
+    tg_days_before INTEGER NOT NULL DEFAULT 3
 );
 
 INSERT OR IGNORE INTO settings (id) VALUES (1);
@@ -75,5 +81,6 @@ INSERT OR IGNORE INTO settings (id) VALUES (1);
 CREATE TABLE IF NOT EXISTS reminder_log (
     card_id TEXT NOT NULL,
     sent_date TEXT NOT NULL,
-    PRIMARY KEY (card_id, sent_date)
+    channel TEXT NOT NULL DEFAULT 'email',
+    PRIMARY KEY (card_id, sent_date, channel)
 );
