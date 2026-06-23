@@ -167,7 +167,7 @@ main{padding:22px;max-width:1180px;width:100%}
 .card-bg{position:absolute;inset:0;background-size:cover;background-position:center right;z-index:0}
 .card-shade{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,.78) 38%,rgba(255,255,255,.22) 68%,rgba(255,255,255,0) 100%)}
 .dark .card-shade{background:linear-gradient(90deg,rgba(18,18,20,.95) 0%,rgba(18,18,20,.78) 38%,rgba(18,18,20,.24) 68%,rgba(18,18,20,0) 100%)}
-.card.hasbg>*:not(.card-bg):not(.card-shade):not(.moreBtn):not(.selcheck){position:relative;z-index:2}
+.card-content{position:relative;z-index:2}
 .card.hasbg .selcheck{z-index:3}
 .card-bg{background-color:var(--line)}
 .moreBtn{position:absolute;top:8px;right:8px;font-size:20px;line-height:1;z-index:3}
@@ -238,6 +238,7 @@ const LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAA
 document.querySelectorAll(".logo").forEach(e=>{e.textContent="";const i=document.createElement("img");i.src=LOGO;e.appendChild(i);});
 let token=sessionStorage.getItem('simhub_token')||'';
 let cards=[]; let view='overview'; let revealed=new Set(); let selectMode=false; let selected=new Set(); let settingsPage='home';
+let cardEls={}; let gridEl=null; let emptyEl=null;
 let maskDefault = localStorage.getItem('simhub_mask')!=='off';
 const EYE='<svg><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF='<svg><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
@@ -325,25 +326,40 @@ function renderOverview(){
     <div class="panel"><h3>最近修改</h3>${recent.map(c=>`<div class="recent"><span>${c.flag||'🌐'} ${esc(c.carrier||'未命名')}</span><span class="sub">${c.updatedAt?new Date(c.updatedAt).toLocaleString():''}</span></div>`).join('')||'<span class="sub">暂无</span>'}</div>`;
 }
 
-function cardHTML(c){
+function cardContentInner(c){
   const d=daysLeft(c);let badge='';if(d<0)badge='<span class="badge exp">已过期</span>';else if(d<=7)badge='<span class="badge soon">'+d+'天</span>';
   const rev=revealed.has(c.id)||!maskDefault;
   const phoneTxt=c.phoneNumber?(rev?esc(c.phoneNumber):maskPhone(c.phoneNumber)):'—';
   const eye=c.phoneNumber?`<button class="iconbtn eyebtn" data-id="${c.id}" onclick="event.stopPropagation();toggleEye('${c.id}')">${rev?EYEOFF:EYE}</button>`:'';
   const icon=c.carrierAppIconURLString?`<img src="${esc(c.carrierAppIconURLString)}" class="appicon" style="width:30px;height:30px">`:`<span class="flag">${c.flag||'🌐'}</span>`;
-  const bg=bgByAsset[c.cardBackgroundAssetName];
-  const bgLayers=bg?`<div class="card-bg" style="background-image:url('${esc(bg)}')"></div><div class="card-shade"></div>`:'';
-  return `<div class="card ${bg?'hasbg':''} ${selected.has(c.id)?'sel':''}" data-id="${c.id}">
-    ${bgLayers}
-    <div class="selcheck">${selected.has(c.id)?'✓':''}</div>
-    <button class="iconbtn moreBtn" data-id="${c.id}" onclick="event.stopPropagation();openDetailById('${c.id}')" aria-label="详情">⋯</button>
-    ${icon}
+  return `${icon}
     <h3>${esc(c.carrier||'未命名')} ${badge}</h3>
     <div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div>
-    <div class="row"><span class="phone">${phoneTxt}${eye}</span><span>${c.expiryDate?new Date(c.expiryDate).toLocaleDateString():''}</span></div>
-  </div>`;
+    <div class="row"><span class="phone">${phoneTxt}${eye}</span><span>${c.expiryDate?new Date(c.expiryDate).toLocaleDateString():''}</span></div>`;
 }
-function toggleEye(id){if(revealed.has(id))revealed.delete(id);else revealed.add(id);render();}
+function ensureCardEl(c){
+  let el=cardEls[c.id];
+  if(!el){
+    el=document.createElement('div');el.dataset.id=c.id;
+    el.innerHTML=`<div class="card-content"></div><div class="selcheck"></div><button class="iconbtn moreBtn" onclick="event.stopPropagation();openDetailById('${c.id}')" aria-label="详情">⋯</button>`;
+    el.addEventListener('click',()=>{if(selectMode)toggleSel(el.dataset.id);});
+    cardEls[c.id]=el;
+  }
+  return el;
+}
+function updateCardEl(el,c){
+  const bg=bgByAsset[c.cardBackgroundAssetName];
+  el.className='card'+(bg?' hasbg':'')+(selected.has(c.id)?' sel':'');
+  let bgEl=el.querySelector('.card-bg'),shadeEl=el.querySelector('.card-shade');
+  if(bg){
+    if(!bgEl){bgEl=document.createElement('div');bgEl.className='card-bg';el.insertBefore(bgEl,el.firstChild);}
+    if(bgEl.dataset.bg!==bg){bgEl.style.backgroundImage="url('"+bg+"')";bgEl.dataset.bg=bg;}
+    if(!shadeEl){shadeEl=document.createElement('div');shadeEl.className='card-shade';el.insertBefore(shadeEl,bgEl.nextSibling);}
+  }else{if(bgEl)bgEl.remove();if(shadeEl)shadeEl.remove();}
+  el.querySelector('.card-content').innerHTML=cardContentInner(c);
+  el.querySelector('.selcheck').textContent=selected.has(c.id)?'✓':'';
+}
+function toggleEye(id){if(revealed.has(id))revealed.delete(id);else revealed.add(id);const el=cardEls[id];const c=cards.find(x=>x.id===id);if(el&&c)el.querySelector('.card-content').innerHTML=cardContentInner(c);}
 
 function filteredCards(){
   const q=(document.getElementById('search')?.value||'').toLowerCase();
@@ -366,9 +382,10 @@ function filteredCards(){
 }
 
 function renderCards(){
-  M().innerHTML=`<div id="toolbarHost"></div>
-    <div id="grid" class="grid"></div>
-    <p id="empty" class="sub hidden" style="text-align:center;padding:40px">无符合条件的卡片</p>`;
+  M().innerHTML='<div id="toolbarHost"></div>';
+  if(!gridEl){gridEl=document.createElement('div');gridEl.id='grid';gridEl.className='grid';}
+  if(!emptyEl){emptyEl=document.createElement('p');emptyEl.id='empty';emptyEl.className='sub hidden';emptyEl.style.cssText='text-align:center;padding:40px';emptyEl.textContent='无符合条件的卡片';}
+  M().appendChild(gridEl);M().appendChild(emptyEl);
   renderToolbar();drawGrid();updateSel();
 }
 function renderToolbar(){
@@ -405,11 +422,12 @@ function renderToolbar(){
 function enterSelect(){selectMode=true;selected.clear();renderToolbar();const g=dG('grid');if(g)g.classList.add('selecting');document.querySelectorAll('.card.sel').forEach(el=>el.classList.remove('sel'));updateSel();}
 function exitSelect(){selectMode=false;selected.clear();renderToolbar();const g=dG('grid');if(g)g.classList.remove('selecting');document.querySelectorAll('.card.sel').forEach(el=>{el.classList.remove('sel');const c=el.querySelector('.selcheck');if(c)c.textContent='';});updateSel();}
 function drawGrid(){
-  const list=filteredCards();const grid=document.getElementById('grid');
+  const list=filteredCards();const grid=gridEl||document.getElementById('grid');if(!grid)return;
   grid.classList.toggle('selecting',selectMode);
-  grid.innerHTML=list.map(cardHTML).join('');
-  document.getElementById('empty').classList.toggle('hidden',list.length>0);
-  grid.querySelectorAll('.card').forEach(el=>el.onclick=()=>{if(selectMode)toggleSel(el.dataset.id);});
+  const keep={};list.forEach(c=>keep[c.id]=1);
+  Object.keys(cardEls).forEach(id=>{if(!keep[id]){if(cardEls[id].parentNode)cardEls[id].remove();delete cardEls[id];}});
+  list.forEach((c,idx)=>{const el=ensureCardEl(c);updateCardEl(el,c);if(grid.children[idx]!==el)grid.insertBefore(el,grid.children[idx]||null);});
+  (emptyEl||document.getElementById('empty')).classList.toggle('hidden',list.length>0);
 }
 
 /* 批量 */
