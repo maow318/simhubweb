@@ -179,6 +179,13 @@ main{padding:22px;max-width:1180px;width:100%}
 .dRow{display:flex;justify-content:space-between;gap:16px;padding:11px 2px;border-bottom:1px solid var(--line);font-size:14px}
 .dRow .dL{color:var(--sub);flex-shrink:0}
 .dRow .dV{text-align:right;word-break:break-all}
+.grid:not(.selecting) .selcheck{display:none}
+.grid.selecting .moreBtn{display:none}
+.batchActions{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
+.scrim.center{justify-content:center;align-items:center}
+.modalBox{background:var(--bg);width:min(560px,94vw);max-height:88vh;overflow:auto;border-radius:18px;padding:22px;animation:pop .2s ease}
+@keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}
+
 
 </style>
 </head>
@@ -328,7 +335,8 @@ function cardHTML(c){
   const bgLayers=bg?`<div class="card-bg" style="background-image:url('${esc(bg)}')"></div><div class="card-shade"></div>`:'';
   return `<div class="card ${bg?'hasbg':''} ${selected.has(c.id)?'sel':''}" data-id="${c.id}">
     ${bgLayers}
-    ${selectMode?`<div class="selcheck">${selected.has(c.id)?'✓':''}</div>`:`<button class="iconbtn moreBtn" data-id="${c.id}" onclick="event.stopPropagation();openDetailById('${c.id}')" aria-label="详情">⋯</button>`}
+    <div class="selcheck">${selected.has(c.id)?'✓':''}</div>
+    <button class="iconbtn moreBtn" data-id="${c.id}" onclick="event.stopPropagation();openDetailById('${c.id}')" aria-label="详情">⋯</button>
     ${icon}
     <h3>${esc(c.carrier||'未命名')} ${badge}</h3>
     <div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div>
@@ -358,20 +366,29 @@ function filteredCards(){
 }
 
 function renderCards(){
+  M().innerHTML=`<div id="toolbarHost"></div>
+    <div id="grid" class="grid"></div>
+    <p id="empty" class="sub hidden" style="text-align:center;padding:40px">无符合条件的卡片</p>`;
+  renderToolbar();drawGrid();updateSel();
+}
+function renderToolbar(){
+  const cur={q:(dG('search')||{}).value||'',c:(dG('fCountry')||{}).value||'',s:(dG('fStatus')||{}).value||'',o:(dG('fSort')||{}).value||''};
   const countries=[...new Set(cards.map(c=>c.countryName).filter(Boolean))].sort();
   const filters=`
       <select id="fCountry"><option value="">全部国家</option>${countries.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <select id="fStatus"><option value="">全部状态</option><option value="active">使用中</option><option value="soon">即将到期</option><option value="exp">已过期</option></select>
       <select id="fSort"><option value="order">默认排序</option><option value="expiry">按到期</option><option value="carrier">按运营商</option></select>`;
-  const toolbar=selectMode?`
+  document.getElementById('toolbarHost').innerHTML=selectMode?`
     <div class="toolbar">
       <input id="search" placeholder="搜索运营商/国家/号码">
       ${filters}
       <span style="flex:1"></span>
-      <span id="selCount" class="sub"></span>
-      <button class="sec" id="tagBtn">批量打标签</button>
-      <button class="danger" id="delBtn">批量删除</button>
-      <button class="ghost" id="doneBtn">完成</button>
+      <div class="batchActions">
+        <span id="selCount" class="sub"></span>
+        <button class="sec" id="tagBtn">批量打标签</button>
+        <button class="danger" id="delBtn">批量删除</button>
+        <button class="ghost" id="doneBtn">完成</button>
+      </div>
     </div>`:`
     <div class="toolbar">
       <input id="search" placeholder="搜索运营商/国家/号码">
@@ -380,29 +397,24 @@ function renderCards(){
       <button class="sec" id="selBtn">批量编辑</button>
       <button id="newBtn">+ 新建卡片</button>
     </div>`;
-  M().innerHTML=toolbar+`
-    <div id="grid" class="grid"></div>
-    <p id="empty" class="sub hidden" style="text-align:center;padding:40px">无符合条件的卡片</p>`;
-  ['search','fCountry','fStatus','fSort'].forEach(id=>document.getElementById(id).addEventListener('input',drawGrid));
-  if(selectMode){
-    document.getElementById('tagBtn').onclick=batchTag;
-    document.getElementById('delBtn').onclick=batchDelete;
-    document.getElementById('doneBtn').onclick=()=>{selectMode=false;selected.clear();renderCards();};
-  }else{
-    document.getElementById('selBtn').onclick=()=>{selectMode=true;selected.clear();renderCards();};
-    document.getElementById('newBtn').onclick=()=>openDrawer(null);
-  }
-  drawGrid();updateSel();
+  if(dG('search')){dG('search').value=cur.q;dG('fCountry').value=cur.c;dG('fStatus').value=cur.s;dG('fSort').value=cur.o;}
+  ['search','fCountry','fStatus','fSort'].forEach(id=>dG(id).addEventListener('input',drawGrid));
+  if(selectMode){dG('tagBtn').onclick=batchTag;dG('delBtn').onclick=batchDelete;dG('doneBtn').onclick=exitSelect;}
+  else{dG('selBtn').onclick=enterSelect;dG('newBtn').onclick=()=>openDrawer(null);}
 }
+function enterSelect(){selectMode=true;selected.clear();renderToolbar();const g=dG('grid');if(g)g.classList.add('selecting');document.querySelectorAll('.card.sel').forEach(el=>el.classList.remove('sel'));updateSel();}
+function exitSelect(){selectMode=false;selected.clear();renderToolbar();const g=dG('grid');if(g)g.classList.remove('selecting');document.querySelectorAll('.card.sel').forEach(el=>{el.classList.remove('sel');const c=el.querySelector('.selcheck');if(c)c.textContent='';});updateSel();}
 function drawGrid(){
-  const list=filteredCards();const grid=document.getElementById('grid');grid.innerHTML=list.map(cardHTML).join('');
+  const list=filteredCards();const grid=document.getElementById('grid');
+  grid.classList.toggle('selecting',selectMode);
+  grid.innerHTML=list.map(cardHTML).join('');
   document.getElementById('empty').classList.toggle('hidden',list.length>0);
-  grid.querySelectorAll('.card').forEach(el=>el.onclick=()=>{const c=cards.find(x=>x.id===el.dataset.id);if(selectMode){toggleSel(c.id);}else openDetail(c);});
+  grid.querySelectorAll('.card').forEach(el=>el.onclick=()=>{if(selectMode)toggleSel(el.dataset.id);});
 }
 
 /* 批量 */
 
-function toggleSel(id){if(selected.has(id))selected.delete(id);else selected.add(id);drawGrid();updateSel();}
+function toggleSel(id){if(selected.has(id))selected.delete(id);else selected.add(id);const el=document.querySelector(`.card[data-id="${id}"]`);if(el){el.classList.toggle('sel',selected.has(id));const ck=el.querySelector('.selcheck');if(ck)ck.textContent=selected.has(id)?'✓':'';}updateSel();}
 function updateSel(){const el=document.getElementById('selCount');if(el)el.textContent='已选 '+selected.size;}
 function batchDelete(){if(!selected.size)return toast('未选择');
   confirmDelete('确定删除选中的 '+selected.size+' 张卡片?此操作无法撤销。',async()=>{
@@ -526,7 +538,7 @@ function openDrawer(card){
   const d=drawerData;
   const f=(id,label,val,ph='')=>`<div class="field"><label>${label}</label><input id="${id}" value="${esc(val||'')}" placeholder="${ph}"></div>`;
   const ta=(id,label,val)=>`<div class="field"><label>${label}</label><textarea id="${id}" rows="3">${esc(val||'')}</textarea></div>`;
-  document.getElementById('drawerHost').innerHTML=`<div class="scrim"><div class="drawer"><h2>${isNew?'新建卡片':'编辑卡片'}</h2>
+  document.getElementById('drawerHost').innerHTML=`<div class="scrim center"><div class="modalBox"><h2>${isNew?'新建卡片':'编辑卡片'}</h2>
     <div class="secLabel">电信商</div>
     ${f('f_carrier','运营商名称',d.carrier,'例如：China Mobile')}
     <div class="field"><label>运营商 App 图标(可选)</label>
@@ -608,7 +620,7 @@ function openDetail(card){
   const price=c.price?`${c.price}${c.currencyCode?(' '+c.currencyCode):''}`:'';
   const tags=(c.tags||[]).join('、');
   const close=()=>document.getElementById('drawerHost').innerHTML='';
-  document.getElementById('drawerHost').innerHTML=`<div class="scrim"><div class="drawer">
+  document.getElementById('drawerHost').innerHTML=`<div class="scrim center"><div class="modalBox">
     <div class="detailHead"><span style="font-size:34px">${c.flag||'🌐'}</span>
       <div><h2 style="margin:0">${esc(c.carrier||'未命名')}</h2><div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div></div></div>
     ${detailRow('电话号码',c.phoneNumber)}
