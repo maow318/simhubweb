@@ -343,8 +343,6 @@ function renderOverview(){
   const byCountry={};cards.forEach(c=>{const k=c.countryName||c.flag||'未知';byCountry[k]=(byCountry[k]||0)+1;});
   const top=Object.entries(byCountry).sort((a,b)=>b[1]-a[1]).slice(0,6);const max=Math.max(1,...top.map(t=>t[1]));
   const recent=[...cards].sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0)).slice(0,5);
-  const tagFreq={};cards.forEach(c=>(c.tags||[]).forEach(t=>tagFreq[t]=(tagFreq[t]||0)+1));
-  const tags=Object.entries(tagFreq).sort((a,b)=>b[1]-a[1]);const tmax=Math.max(1,...tags.map(t=>t[1]));
   M().innerHTML=`
     <div class="statgrid">
       <div class="stat"><div class="n">${total}</div><div class="l">卡片总数</div></div>
@@ -354,7 +352,6 @@ function renderOverview(){
     </div>
     <div class="panel"><h3>未来 6 个月到期趋势</h3><div class="chartwrap"><canvas id="trendChart"></canvas></div></div>
     <div class="panel"><h3>国家 / 地区分布</h3>${top.map(([k,v])=>`<div class="bar"><span style="width:90px">${esc(k)}</span><div class="track"><div class="fill" style="width:${v/max*100}%"></div></div><span>${v}</span></div>`).join('')||'<span class="sub">暂无数据</span>'}</div>
-    <div class="panel"><h3>标签</h3><div class="tagcloud">${tags.map(([t,n])=>`<span class="tc" style="font-size:${12+Math.round(n/tmax*8)}px">${esc(t)} ${n}</span>`).join('')||'<span class="sub">暂无标签</span>'}</div></div>
     <div class="panel"><h3>最近修改</h3>${recent.map(c=>`<div class="recent"><span>${c.flag||'🌐'} ${esc(c.carrier||'未命名')}</span><span class="sub">${c.updatedAt?new Date(c.updatedAt).toLocaleString():''}</span></div>`).join('')||'<span class="sub">暂无</span>'}</div>
     <div class="panel"><h3>最近活动</h3><div class="acts" id="actList"><span class="sub">加载中…</span></div></div>`;
   drawTrendChart();loadActivity();
