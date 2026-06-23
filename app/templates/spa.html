@@ -167,7 +167,19 @@ main{padding:22px;max-width:1180px;width:100%}
 .card-bg{position:absolute;inset:0;background-size:cover;background-position:center right;z-index:0}
 .card-shade{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,.78) 38%,rgba(255,255,255,.22) 68%,rgba(255,255,255,0) 100%)}
 .dark .card-shade{background:linear-gradient(90deg,rgba(18,18,20,.95) 0%,rgba(18,18,20,.78) 38%,rgba(18,18,20,.24) 68%,rgba(18,18,20,0) 100%)}
-.card.hasbg>*:not(.card-bg):not(.card-shade){position:relative;z-index:2}
+.card.hasbg>*:not(.card-bg):not(.card-shade):not(.moreBtn):not(.selcheck){position:relative;z-index:2}
+.card.hasbg .selcheck{z-index:3}
+.card-bg{background-color:var(--line)}
+.moreBtn{position:absolute;top:8px;right:8px;font-size:20px;line-height:1;z-index:3}
+.card:not(.hasbg) .moreBtn{color:var(--sub)}
+.card.hasbg .moreBtn{color:#fff;background:rgba(0,0,0,.3)}
+.card.hasbg .moreBtn:hover{background:rgba(0,0,0,.45)}
+.detailHead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.detailHead h2{font-size:20px;letter-spacing:-.02em}
+.dRow{display:flex;justify-content:space-between;gap:16px;padding:11px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.dRow .dL{color:var(--sub);flex-shrink:0}
+.dRow .dV{text-align:right;word-break:break-all}
+
 </style>
 </head>
 <body>
@@ -277,7 +289,8 @@ function setView(v){view=v;document.querySelectorAll('#nav a').forEach(a=>a.clas
 
 async function enterApp(){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');await loadStatus();await loadCountries();await loadCards();}
 async function loadStatus(){try{const s=await api('/api/status');document.getElementById('deviceMeta').textContent=(s.deviceName||'')+' · '+(s.connectedDevices||0)+' 台在线';}catch(e){}}
-async function loadCards(){try{cards=await api('/api/cards')||[];render();}catch(e){toast(e.message);}}
+async function loadCards(){try{cards=await api('/api/cards')||[];preloadBgs();render();}catch(e){toast(e.message);}}
+function preloadBgs(){cards.forEach(c=>{const u=bgByAsset[c.cardBackgroundAssetName];if(u){const i=new Image();i.src=u;}});}
 
 /* 渲染分发 */
 const M=()=>document.getElementById('main');
@@ -315,7 +328,7 @@ function cardHTML(c){
   const bgLayers=bg?`<div class="card-bg" style="background-image:url('${esc(bg)}')"></div><div class="card-shade"></div>`:'';
   return `<div class="card ${bg?'hasbg':''} ${selected.has(c.id)?'sel':''}" data-id="${c.id}">
     ${bgLayers}
-    ${selectMode?`<div class="selcheck">${selected.has(c.id)?'✓':''}</div>`:''}
+    ${selectMode?`<div class="selcheck">${selected.has(c.id)?'✓':''}</div>`:`<button class="iconbtn moreBtn" data-id="${c.id}" onclick="event.stopPropagation();openDetailById('${c.id}')" aria-label="详情">⋯</button>`}
     ${icon}
     <h3>${esc(c.carrier||'未命名')} ${badge}</h3>
     <div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div>
@@ -384,7 +397,7 @@ function renderCards(){
 function drawGrid(){
   const list=filteredCards();const grid=document.getElementById('grid');grid.innerHTML=list.map(cardHTML).join('');
   document.getElementById('empty').classList.toggle('hidden',list.length>0);
-  grid.querySelectorAll('.card').forEach(el=>el.onclick=()=>{const c=cards.find(x=>x.id===el.dataset.id);if(selectMode){toggleSel(c.id);}else openDrawer(c);});
+  grid.querySelectorAll('.card').forEach(el=>el.onclick=()=>{const c=cards.find(x=>x.id===el.dataset.id);if(selectMode){toggleSel(c.id);}else openDetail(c);});
 }
 
 /* 批量 */
@@ -584,6 +597,41 @@ async function save(orig,isNew){
   }catch(e){btn.disabled=false;btn.textContent='保存';
     if(e.code==='CONFLICT'){if(confirm('App 内这张卡已被修改。重新加载最新数据?')){document.getElementById('drawerHost').innerHTML='';await loadCards();}}
     else toast(e.message||'保存失败');}
+}
+function openDetailById(id){const c=cards.find(x=>x.id===id);if(c)openDetail(c);}
+function detailRow(label,val){return (val||val===0)?`<div class="dRow"><span class="dL">${esc(label)}</span><span class="dV">${esc(val)}</span></div>`:'';}
+function openDetail(card){
+  const c=card;const dl=daysLeft(c);
+  const start=c.activationDate?new Date(c.activationDate).toLocaleDateString():'';
+  const expiry=c.expiryDate?new Date(c.expiryDate).toLocaleDateString():'';
+  const leftTxt=Number.isFinite(dl)?(dl>=0?`剩余 ${dl} 天`:`已过期 ${-dl} 天`):'';
+  const price=c.price?`${c.price}${c.currencyCode?(' '+c.currencyCode):''}`:'';
+  const tags=(c.tags||[]).join('、');
+  const close=()=>document.getElementById('drawerHost').innerHTML='';
+  document.getElementById('drawerHost').innerHTML=`<div class="scrim"><div class="drawer">
+    <div class="detailHead"><span style="font-size:34px">${c.flag||'🌐'}</span>
+      <div><h2 style="margin:0">${esc(c.carrier||'未命名')}</h2><div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div></div></div>
+    ${detailRow('电话号码',c.phoneNumber)}
+    ${detailRow('套餐',c.plan)}
+    ${detailRow('价格',price)}
+    ${detailRow('目前余额',c.currentBalance)}
+    ${detailRow('开始日期',start)}
+    ${detailRow('到期日期',expiry+(leftTxt?`（${leftTxt}）`:''))}
+    ${detailRow('续期周期',c.renewDays?`${c.renewDays} 天`:'')}
+    ${detailRow('SM-DP+ 地址',c.smdpAddress)}
+    ${detailRow('激活码',c.activationCode)}
+    ${detailRow('确认码',c.confirmationCode)}
+    ${detailRow('EID',c.eid)}
+    ${detailRow('标签',tags)}
+    ${detailRow('官网',c.websiteURL)}
+    ${detailRow('流水记录',c.transactionNotes)}
+    ${detailRow('自订提示词',c.customPrompt)}
+    <div class="drawerActions" style="margin-top:18px"><button id="dtEdit" style="flex:1">编辑</button><button class="danger" id="dtDel">删除</button><button class="sec" id="dtClose">关闭</button></div>
+  </div></div>`;
+  dG('dtClose').onclick=close;
+  document.querySelector('#drawerHost .scrim').onclick=e=>{if(e.target.classList.contains('scrim'))close();};
+  dG('dtEdit').onclick=()=>openDrawer(c);
+  dG('dtDel').onclick=()=>delCard(c);
 }
 function delCard(card){
   confirmDelete('确定删除这张卡片「'+(card.carrier||'未命名')+'」?此操作无法撤销。',async()=>{
