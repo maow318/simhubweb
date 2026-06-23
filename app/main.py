@@ -17,7 +17,13 @@ from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 from functools import wraps
 
-from .countries import COUNTRIES
+from .countries import (
+    COUNTRIES,
+    CODE_TO_ASSET,
+    NAME_BY_CODE,
+    code_from_flag,
+    flag_from_code,
+)
 
 from flask import (
     Flask,
@@ -511,7 +517,12 @@ def create_app():
     @app.route("/api/countries")
     @login_required
     def api_countries():
-        return api_ok(COUNTRIES)
+        out = []
+        for c in COUNTRIES:
+            item = dict(c)
+            item["bgUrl"] = url_for("static", filename=c["bgFile"]) if c.get("bgFile") else ""
+            out.append(item)
+        return api_ok(out)
 
     @app.route("/api/appsearch")
     @login_required
@@ -1036,6 +1047,25 @@ def normalize_dto(data, existing=None):
         "renewalUnit": blank_none(base.get("renewalUnit")) or "days",
         "renewalIntervalValue": parse_optional_int(base.get("renewalIntervalValue")) or renew_days,
     }
+    fill_country_assets(dto)
+    return dto
+
+
+def fill_country_assets(dto):
+    """JSON 兼容：按国家代码 ↔ 国旗 ↔ 名称 ↔ 卡片背景互相补全。"""
+    code = dto.get("countryCode") or ""
+    flag = dto.get("flag") or ""
+    if not code and flag and flag != "🌐":
+        code = code_from_flag(flag)
+        if code:
+            dto["countryCode"] = code
+    if code:
+        if not dto.get("flag") or dto["flag"] == "🌐":
+            dto["flag"] = flag_from_code(code)
+        if not dto.get("countryName") and code in NAME_BY_CODE:
+            dto["countryName"] = NAME_BY_CODE[code]
+        if not dto.get("cardBackgroundAssetName") and code in CODE_TO_ASSET:
+            dto["cardBackgroundAssetName"] = CODE_TO_ASSET[code]
     return dto
 
 

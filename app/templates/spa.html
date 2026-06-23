@@ -162,6 +162,15 @@ main{padding:22px;max-width:1180px;width:100%}
 .subhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .subhead h2{font-size:20px;margin:0;font-weight:600;letter-spacing:-.02em}
 .subhead .iconbtn{width:34px;height:34px}
+.card.hasbg{border:none;color:#fff}
+.card.hasbg h3{color:#fff}
+.card.hasbg .sub{color:rgba(255,255,255,.85)}
+.card.hasbg .row{color:rgba(255,255,255,.82)}
+.card.hasbg .iconbtn{color:rgba(255,255,255,.9)}
+.card.hasbg .flag{text-shadow:0 1px 3px rgba(0,0,0,.45)}
+.card-bg{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0}
+.card-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.66));z-index:1}
+.card.hasbg>*:not(.card-bg):not(.card-shade){position:relative;z-index:2}
 </style>
 </head>
 <body>
@@ -269,7 +278,7 @@ function setView(v){view=v;document.querySelectorAll('#nav a').forEach(a=>a.clas
   const titles={overview:'概览',cards:'卡片管理',io:'导入与导出',settings:'设置'};
   document.getElementById('pageTitle').textContent=titles[v];selectMode=false;selected.clear();settingsPage='home';render();}
 
-async function enterApp(){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');await loadStatus();await loadCards();}
+async function enterApp(){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');await loadStatus();await loadCountries();await loadCards();}
 async function loadStatus(){try{const s=await api('/api/status');document.getElementById('deviceMeta').textContent=(s.deviceName||'')+' · '+(s.connectedDevices||0)+' 台在线';}catch(e){}}
 async function loadCards(){try{cards=await api('/api/cards')||[];render();}catch(e){toast(e.message);}}
 
@@ -305,7 +314,10 @@ function cardHTML(c){
   const phoneTxt=c.phoneNumber?(rev?esc(c.phoneNumber):maskPhone(c.phoneNumber)):'—';
   const eye=c.phoneNumber?`<button class="iconbtn eyebtn" data-id="${c.id}" onclick="event.stopPropagation();toggleEye('${c.id}')">${rev?EYEOFF:EYE}</button>`:'';
   const icon=c.carrierAppIconURLString?`<img src="${esc(c.carrierAppIconURLString)}" class="appicon" style="width:30px;height:30px">`:`<span class="flag">${c.flag||'🌐'}</span>`;
-  return `<div class="card ${selected.has(c.id)?'sel':''}" data-id="${c.id}">
+  const bg=bgByAsset[c.cardBackgroundAssetName];
+  const bgLayers=bg?`<div class="card-bg" style="background-image:url('${esc(bg)}')"></div><div class="card-shade"></div>`:'';
+  return `<div class="card ${bg?'hasbg':''} ${selected.has(c.id)?'sel':''}" data-id="${c.id}">
+    ${bgLayers}
     ${selectMode?`<div class="selcheck">${selected.has(c.id)?'✓':''}</div>`:''}
     ${icon}
     <h3>${esc(c.carrier||'未命名')} ${badge}</h3>
@@ -516,6 +528,7 @@ function openDrawer(card){
       <input id="f_currencyCode" value="${esc(d.currencyCode||'USD')}" style="max-width:90px"></div></div>
     ${f('f_phoneNumber','电话号码',d.phoneNumber,'+1 234 567 8900')}
     <div class="field"><label>国家 / 地区</label><button class="pickRow" id="countryRow"></button></div>
+    <div class="field"><label>卡片背景</label><button class="pickRow" id="bgRow"></button></div>
     ${f('f_websiteURL','官网链接',d.websiteURL,'https://...')}
     ${f('f_currentBalance','目前余额',d.currentBalance,'32.50')}
     ${ta('f_transactionNotes','流水记录',d.transactionNotes)}
@@ -534,9 +547,10 @@ function openDrawer(card){
     <div id="daySummary" class="summary"></div>
     <div class="drawerActions"><button id="saveBtn" style="flex:1">保存</button>${isNew?'':'<button class="danger" id="delBtn2">删除</button>'}<button class="sec" id="cancelBtn">取消</button></div>
     </div></div>`;
-  refreshAppRow();refreshCountryRow();updateSummary();
+  refreshAppRow();refreshCountryRow();refreshBgRow();updateSummary();
   dG('appRow').onclick=()=>openAppPicker();
   dG('countryRow').onclick=()=>openCountryPicker();
+  dG('bgRow').onclick=()=>openBgPicker();
   dG('durs').querySelectorAll('.dur').forEach(b=>b.onclick=()=>{const s=dG('f_start').value||new Date().toISOString().slice(0,10);dG('f_expiry').value=isoNoMillis(addDays(new Date(s),+b.dataset.n)).slice(0,10);updateSummary();});
   dG('f_start').onchange=updateSummary;dG('f_expiry').onchange=updateSummary;
   dG('cancelBtn').onclick=()=>document.getElementById('drawerHost').innerHTML='';
@@ -545,6 +559,7 @@ function openDrawer(card){
 }
 function refreshAppRow(){const d=drawerData;dG('appRow').innerHTML=d.carrierAppIconURLString?`<img src="${esc(d.carrierAppIconURLString)}" class="appicon"><span>${esc(d.carrierAppName||'已选图标')}</span><span class="chev">›</span>`:`<span class="ph">从 App Store 选择图标</span><span class="chev">›</span>`;}
 function refreshCountryRow(){const d=drawerData;dG('countryRow').innerHTML=`<span style="font-size:20px">${d.flag||'🌐'}</span><span>${esc(d.countryName||'选择国家 / 地区')}</span><span class="chev">›</span>`;}
+function refreshBgRow(){const d=drawerData;const bg=bgByAsset[d.cardBackgroundAssetName];dG('bgRow').innerHTML=bg?`<img src="${esc(bg)}" class="appicon" style="object-fit:cover"><span>${esc(d.countryName||'已选背景')}</span><span class="chev">›</span>`:`<span class="ph">默认（无背景图）</span><span class="chev">›</span>`;}
 function updateSummary(){const s=dG('f_start').value,e=dG('f_expiry').value;dG('daySummary').textContent=(s&&e)?`开始 ${s} → 到期 ${e}（${daySpan(new Date(s),new Date(e))} 天）`:'';}
 
 async function save(orig,isNew){
@@ -579,9 +594,15 @@ function delCard(card){
   });}
 
 /* 国家 / 地区选择器(数据来自 App 的 CountryRegion) */
-let countriesCache=null;
+let countriesCache=null; let bgByAsset={};
+async function loadCountries(){
+  if(countriesCache)return countriesCache;
+  try{countriesCache=await api('/api/countries')||[];}catch(e){countriesCache=[];}
+  bgByAsset={};countriesCache.forEach(c=>{if(c.bgAsset&&c.bgUrl)bgByAsset[c.bgAsset]=c.bgUrl;});
+  return countriesCache;
+}
 async function openCountryPicker(){
-  if(!countriesCache){try{countriesCache=await api('/api/countries')||[];}catch(e){return toast(e.message);}}
+  await loadCountries();
   const host=document.getElementById('pickerHost');
   host.innerHTML=`<div class="scrim picker"><div class="pickerBox"><div class="pickerHead"><b>选择国家 / 地区</b><button class="iconbtn" id="pkClose">✕</button></div>
     <input id="pkSearch" placeholder="搜索国家、代码或区号" autofocus>
@@ -589,8 +610,24 @@ async function openCountryPicker(){
   const draw=()=>{const q=dG('pkSearch').value.toLowerCase();
     dG('pkList').innerHTML=countriesCache.filter(c=>!q||[c.name,c.english,c.code,c.calling].join(' ').toLowerCase().includes(q)).slice(0,400)
       .map(c=>`<div class="pkItem" data-code="${c.code}"><span style="font-size:22px">${c.flag||'🌐'}</span><div><div>${esc(c.name)}</div><div class="sub">${c.code} · +${c.calling||''} · ${esc(c.english||'')}</div></div></div>`).join('');
-    dG('pkList').querySelectorAll('.pkItem').forEach(el=>el.onclick=()=>{const c=countriesCache.find(x=>x.code===el.dataset.code);drawerData.countryCode=c.code;drawerData.countryName=c.name;drawerData.flag=c.flag||'🌐';refreshCountryRow();host.innerHTML='';});};
+    dG('pkList').querySelectorAll('.pkItem').forEach(el=>el.onclick=()=>{const c=countriesCache.find(x=>x.code===el.dataset.code);drawerData.countryCode=c.code;drawerData.countryName=c.name;drawerData.flag=c.flag||'🌐';drawerData.cardBackgroundAssetName=c.bgAsset||'';refreshCountryRow();refreshBgRow();host.innerHTML='';});};
   dG('pkSearch').addEventListener('input',draw);dG('pkClose').onclick=()=>host.innerHTML='';
+  host.querySelector('.scrim').onclick=e=>{if(e.target.classList.contains('scrim'))host.innerHTML='';};draw();
+}
+async function openBgPicker(){
+  await loadCountries();
+  const host=document.getElementById('pickerHost');
+  const withBg=countriesCache.filter(c=>c.bgUrl);
+  host.innerHTML=`<div class="scrim picker"><div class="pickerBox"><div class="pickerHead"><b>选择卡片背景</b><button class="iconbtn" id="bgClose">✕</button></div>
+    <input id="bgSearch" placeholder="搜索国家">
+    <div class="pickerList" id="bgList"></div></div></div>`;
+  const draw=()=>{const q=dG('bgSearch').value.toLowerCase();
+    const head=`<div class="pkItem" data-asset=""><span style="font-size:22px">🚫</span><div><div>默认（无背景图）</div></div></div>`;
+    const rows=withBg.filter(c=>!q||[c.name,c.english,c.code].join(' ').toLowerCase().includes(q)).slice(0,400)
+      .map(c=>`<div class="pkItem" data-asset="${c.bgAsset}"><img src="${esc(c.bgUrl)}" class="appicon" style="object-fit:cover"><div><div>${esc(c.name)}</div><div class="sub">${esc(c.english||c.code)}</div></div></div>`);
+    dG('bgList').innerHTML=[head].concat(rows).join('');
+    dG('bgList').querySelectorAll('.pkItem').forEach(el=>el.onclick=()=>{drawerData.cardBackgroundAssetName=el.dataset.asset;refreshBgRow();host.innerHTML='';});};
+  dG('bgSearch').addEventListener('input',draw);dG('bgClose').onclick=()=>host.innerHTML='';
   host.querySelector('.scrim').onclick=e=>{if(e.target.classList.contains('scrim'))host.innerHTML='';};draw();
 }
 

@@ -110,17 +110,63 @@ _RAW = [
 ]
 
 
-def _flag(code):
-    return "".join(chr(0x1F1E6 + ord(ch) - ord("A")) for ch in code.upper())
+import json
+import os
+
+# 已有的中文名作为本地化覆盖来源（country_map.json 只带英文名）。
+_ZH = {code: name for code, name, _english, _calling in _RAW}
 
 
-COUNTRIES = [
-    {
-        "code": code,
-        "name": name,
-        "english": english,
-        "flag": _flag(code),
-        "calling": calling,
-    }
-    for code, name, english, calling in _RAW
-]
+def flag_from_code(code):
+    """2 字母 ISO 代码 → 国旗 emoji；无效则返回地球。"""
+    code = (code or "").strip().upper()
+    if len(code) != 2 or not code.isalpha():
+        return "🌐"
+    return "".join(chr(0x1F1E6 + ord(ch) - ord("A")) for ch in code)
+
+
+def code_from_flag(flag):
+    """国旗 emoji → 2 字母 ISO 代码；无法识别则返回空串。"""
+    scalars = [ord(ch) for ch in (flag or "")]
+    letters = [chr(ord("A") + s - 0x1F1E6) for s in scalars if 0x1F1E6 <= s <= 0x1F1FF]
+    return "".join(letters) if len(letters) == 2 else ""
+
+
+def _load_map():
+    path = os.path.join(os.path.dirname(__file__), "country_map.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh).get("countries", [])
+    except (OSError, ValueError):
+        return []
+
+
+_MAP = _load_map()
+
+COUNTRIES = []
+for entry in _MAP:
+    code = entry.get("countryCode", "")
+    english = entry.get("englishName", "") or ""
+    calling = (entry.get("callingCodes") or [""])[0].lstrip("+")
+    COUNTRIES.append(
+        {
+            "code": code,
+            "name": _ZH.get(code) or english or code,
+            "english": english,
+            "flag": entry.get("flag") or flag_from_code(code),
+            "calling": calling,
+            "bgAsset": entry.get("cardBackgroundAssetName", "") or "",
+            "bgFile": entry.get("cardBackgroundFile", "") or "",
+        }
+    )
+
+# 兜底：若 country_map.json 缺失，退回手写列表。
+if not COUNTRIES:
+    COUNTRIES = [
+        {"code": c, "name": n, "english": e, "flag": flag_from_code(c), "calling": cc, "bgAsset": "", "bgFile": ""}
+        for c, n, e, cc in _RAW
+    ]
+
+NAME_BY_CODE = {c["code"]: c["name"] for c in COUNTRIES}
+CODE_TO_ASSET = {c["code"]: c["bgAsset"] for c in COUNTRIES if c["bgAsset"]}
+ASSET_TO_FILE = {c["bgAsset"]: c["bgFile"] for c in COUNTRIES if c["bgAsset"] and c["bgFile"]}
