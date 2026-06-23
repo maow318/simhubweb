@@ -50,11 +50,11 @@ CREATE INDEX IF NOT EXISTS idx_cards_order ON cards(order_index);
 
 CREATE TABLE IF NOT EXISTS activity_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    card_id TEXT NOT NULL,
+    card_id TEXT,
+    card_label TEXT,
     action TEXT NOT NULL,
     note TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS settings (

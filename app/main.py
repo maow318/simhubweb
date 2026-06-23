@@ -162,7 +162,7 @@ def create_app():
     def before_request():
         init_db()
         g.user = current_user()
-        public_endpoints = {"setup", "login", "login_code", "static", "api_status"}
+        public_endpoints = {"setup", "login", "login_code", "static", "api_status", "manifest", "service_worker"}
         if user_count() == 0 and request.endpoint not in public_endpoints:
             if request.path.startswith("/api/"):
                 return api_fail("请先创建管理员", "SETUP_REQUIRED", 403)
@@ -441,6 +441,7 @@ def create_app():
         dto["id"] = str(uuid.uuid4())
         dto["orderIndex"] = next_order_index()
         insert_card(dto)
+        log_activity(dto["id"], "create", "新建卡片", label=dto.get("carrier") or "未命名")
         get_db().commit()
         return api_ok(dto, 201)
 
@@ -452,12 +453,14 @@ def create_app():
             return api_ok(card)
         if request.method == "DELETE":
             get_db().execute("DELETE FROM cards WHERE id = ?", (card_id,))
+            log_activity(card_id, "delete", "删除卡片", label=card.get("carrier") or "未命名")
             get_db().commit()
             return api_ok({"deleted": True})
 
         dto = normalize_dto(request.get_json(silent=True) or {}, existing=card)
         dto["id"] = card_id
         update_card(card_id, dto)
+        log_activity(card_id, "edit", "编辑卡片", label=dto.get("carrier") or "未命名")
         get_db().commit()
         return api_ok(get_card(card_id))
 
@@ -470,7 +473,13 @@ def create_app():
         if action == "delete":
             deleted = 0
             for card_id in set(ids):
+                try:
+                    label = get_card(card_id).get("carrier") or "未命名"
+                except Exception:
+                    label = ""
                 cur = get_db().execute("DELETE FROM cards WHERE id = ?", (card_id,))
+                if cur.rowcount:
+                    log_activity(card_id, "delete", "批量删除", label=label)
                 deleted += cur.rowcount
             get_db().commit()
             return api_ok({"deleted": deleted})
@@ -484,6 +493,7 @@ def create_app():
                     continue
                 card["tags"] = normalize_tags(card.get("tags", []) + tags)
                 update_card(card_id, card)
+                log_activity(card_id, "edit", "批量打标签：" + "、".join(tags), label=card.get("carrier") or "未命名")
                 updated += 1
             get_db().commit()
             return api_ok({"updated": updated})
@@ -518,8 +528,68 @@ def create_app():
             dto["orderIndex"] = next_order_index() + imported
             insert_card(dto)
             imported += 1
+        if imported:
+            log_activity("", "import", f"导入 {imported} 张卡片（跳过 {skipped}）", label="导入")
         get_db().commit()
         return api_ok({"imported": imported, "skipped": skipped})
+
+    @app.route("/api/activity")
+    @login_required
+    def api_activity():
+        rows = get_db().execute(
+            "SELECT card_id, card_label, action, note, created_at "
+            "FROM activity_log ORDER BY id DESC LIMIT 50"
+        ).fetchall()
+        return api_ok(
+            [
+                {
+                    "cardId": r["card_id"],
+                    "label": r["card_label"],
+                    "action": r["action"],
+                    "note": r["note"],
+                    "createdAt": r["created_at"],
+                }
+                for r in rows
+            ]
+        )
+
+    @app.route("/manifest.webmanifest")
+    def manifest():
+        data = {
+            "name": "SIMHUB Web",
+            "short_name": "SIMHUB",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#f2f2f7",
+            "theme_color": "#0a84ff",
+            "icons": [
+                {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+            ],
+        }
+        return Response(json.dumps(data), mimetype="application/manifest+json")
+
+    @app.route("/sw.js")
+    def service_worker():
+        sw = """
+const CACHE='simhub-v1';
+const ASSETS=['/static/styles.css','/static/icon-192.png','/static/icon-512.png'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})).then(()=>self.skipWaiting()));});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
+self.addEventListener('fetch',e=>{
+  const req=e.request; if(req.method!=='GET')return;
+  const url=new URL(req.url);
+  if(url.pathname.startsWith('/static/')){
+    e.respondWith(caches.match(req).then(r=>r||fetch(req).then(resp=>{const cp=resp.clone();caches.open(CACHE).then(c=>c.put(req,cp));return resp;})));
+    return;
+  }
+  e.respondWith(fetch(req).catch(()=>caches.match(req)));
+});
+"""
+        resp = Response(sw, mimetype="application/javascript")
+        resp.headers["Service-Worker-Allowed"] = "/"
+        return resp
 
     @app.route("/api/countries")
     @login_required
@@ -714,6 +784,22 @@ def init_db():
     columns = {row["name"] for row in get_db().execute("PRAGMA table_info(users)")}
     if "email" not in columns:
         get_db().execute("ALTER TABLE users ADD COLUMN email TEXT")
+    # 迁移 activity_log：去掉会随删卡级联清空的外键，加 card_label 留存卡名
+    acols = {row["name"] for row in get_db().execute("PRAGMA table_info(activity_log)")}
+    if acols and "card_label" not in acols:
+        get_db().executescript(
+            """
+            CREATE TABLE activity_log_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_id TEXT, card_label TEXT, action TEXT NOT NULL, note TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO activity_log_new (id, card_id, action, note, created_at)
+                SELECT id, card_id, action, note, created_at FROM activity_log;
+            DROP TABLE activity_log;
+            ALTER TABLE activity_log_new RENAME TO activity_log;
+            """
+        )
     get_db().commit()
     g._db_initialized = True
 
@@ -1423,10 +1509,10 @@ def export_cards_response(cards):
     )
 
 
-def log_activity(card_id, action, note):
+def log_activity(card_id, action, note, label=""):
     get_db().execute(
-        "INSERT INTO activity_log (card_id, action, note) VALUES (?, ?, ?)",
-        (card_id, action, note),
+        "INSERT INTO activity_log (card_id, card_label, action, note) VALUES (?, ?, ?, ?)",
+        (card_id or "", label or "", action, note),
     )
 
 
