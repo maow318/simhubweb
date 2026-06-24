@@ -345,7 +345,7 @@ def create_app():
     def renew_card(card_id):
         validate_csrf()
         card = get_card(card_id)
-        renew_days = max(int(card.get("renewDays") or 30), 1)
+        renew_days = max(parse_int(card.get("renewDays"), 30), 1)
         start = date.today()
         expiry = start + timedelta(days=renew_days)
         updated = dict(card)
@@ -482,7 +482,16 @@ def create_app():
         err = api_guard()
         if err:
             return err
-        dto = normalize_dto(request.get_json(silent=True) or {}, existing=card)
+        body = request.get_json(silent=True) or {}
+        client_seen = body.get("updatedAt")
+        if client_seen and card.get("updatedAt"):
+            client_seen_at = parse_iso(client_seen)
+            server_seen_at = parse_iso(card.get("updatedAt"))
+            if not client_seen_at or not server_seen_at or client_seen_at != server_seen_at:
+                return api_fail("卡片已被其他页面修改，请刷新后重试", "CONFLICT", 409)
+        dto = normalize_dto(body, existing=card)
+        if not dto.get("carrier"):
+            return api_fail("运营商名称不能为空", "CARRIER_REQUIRED", 400)
         dto["id"] = card_id
         update_card(card_id, dto)
         log_activity(card_id, "edit", "编辑卡片", label=dto.get("carrier") or "未命名")
@@ -496,7 +505,10 @@ def create_app():
         if err:
             return err
         body = request.get_json(silent=True) or {}
-        ids = [item for item in body.get("ids", []) if isinstance(item, str)]
+        raw_ids = body.get("ids", [])
+        if not isinstance(raw_ids, list):
+            return api_fail("ids 必须是数组", "BAD_REQUEST", 400)
+        ids = [item for item in raw_ids if isinstance(item, str)]
         action = body.get("action", "")
         if action == "delete":
             deleted = 0
@@ -513,6 +525,8 @@ def create_app():
             return api_ok({"deleted": deleted})
         if action == "addTags":
             tags = normalize_tags(body.get("tags", []))
+            if not tags:
+                return api_fail("标签不能为空", "BAD_REQUEST", 400)
             updated = 0
             for card_id in set(ids):
                 try:
@@ -549,6 +563,9 @@ def create_app():
         imported = 0
         skipped = 0
         for dto in dtos:
+            if not dto.get("carrier"):
+                skipped += 1
+                continue
             if dto.get("id") and card_exists(dto["id"]):
                 skipped += 1
                 continue
@@ -674,8 +691,10 @@ self.addEventListener('fetch',e=>{
         if err:
             return err
         body = request.get_json(silent=True) or {}
-        current = body.get("current", "")
-        new_password = body.get("new", "")
+        current = text_field(body, "current", strip=False)
+        new_password = text_field(body, "new", strip=False)
+        if current is None or new_password is None:
+            return api_fail("密码字段必须是字符串", "BAD_BODY", 400)
         row = get_db().execute(
             "SELECT password_hash FROM users WHERE id = ?", (g.user["id"],)
         ).fetchone()
@@ -697,7 +716,7 @@ self.addEventListener('fetch',e=>{
         return api_ok(
             {
                 "host": row["smtp_host"],
-                "port": row["smtp_port"],
+                "port": parse_port(row["smtp_port"], 465) or 465,
                 "username": row["smtp_username"],
                 "hasPassword": bool(row["smtp_password"]),
                 "recipient": row["recipient"],
@@ -717,25 +736,30 @@ self.addEventListener('fetch',e=>{
         if err:
             return err
         body = request.get_json(silent=True) or {}
-        host = (body.get("host") or "").strip()
-        username = (body.get("username") or "").strip()
-        recipient = (body.get("recipient") or "").strip()
-        try:
-            port = int(body.get("port") or 465)
-        except (TypeError, ValueError):
-            return api_fail("端口必须是数字", "BAD_PORT", 400)
+        host = text_field(body, "host")
+        username = text_field(body, "username")
+        recipient = text_field(body, "recipient")
+        method_in = text_field(body, "twofaMethod", "email")
+        password = optional_text_field(body, "password")
+        if None in (host, username, recipient, method_in) or password is None:
+            return api_fail("SMTP 配置字段格式不正确", "BAD_BODY", 400)
+        port = parse_port(body.get("port"), 465)
+        if port is None:
+            return api_fail("端口必须是 1-65535 的数字", "BAD_PORT", 400)
         if username and not valid_email(username):
             return api_fail("发信邮箱格式不正确", "BAD_EMAIL", 400)
         if recipient and not valid_email(recipient):
             return api_fail("收件邮箱格式不正确", "BAD_EMAIL", 400)
+        reminder_days = parse_nonnegative_int_field(body.get("reminderDaysBefore"), 3)
+        if reminder_days is None:
+            return api_fail("提前提醒天数必须是数字", "BAD_DAYS", 400)
         row = get_settings()
         # 密码留空表示不修改；传入新值则加密保存
-        password = body.get("password")
         if password is None or password == "":
             enc = row["smtp_password"]
         else:
-            enc = encrypt_secret(password.strip())
-        method = "telegram" if body.get("twofaMethod") == "telegram" else "email"
+            enc = encrypt_secret(password)
+        method = "telegram" if method_in == "telegram" else "email"
         get_db().execute(
             """UPDATE settings SET smtp_host=?, smtp_port=?, smtp_username=?, smtp_password=?,
                recipient=?, twofa_enabled=?, twofa_method=?, reminder_enabled=?, reminder_days_before=? WHERE id=1""",
@@ -745,10 +769,10 @@ self.addEventListener('fetch',e=>{
                 username,
                 enc,
                 recipient,
-                1 if body.get("twofaEnabled") else 0,
+                1 if parse_bool(body.get("twofaEnabled")) else 0,
                 method,
-                1 if body.get("reminderEnabled") else 0,
-                max(int(body.get("reminderDaysBefore") or 3), 0),
+                1 if parse_bool(body.get("reminderEnabled")) else 0,
+                reminder_days,
             ),
         )
         get_db().commit()
@@ -798,17 +822,23 @@ self.addEventListener('fetch',e=>{
             return err
         body = request.get_json(silent=True) or {}
         row = get_settings()
-        token_in = body.get("token")
-        enc = row["tg_token"] if (token_in is None or token_in == "") else encrypt_secret(token_in.strip())
+        reminder_days = parse_nonnegative_int_field(body.get("daysBefore"), 3)
+        if reminder_days is None:
+            return api_fail("提前提醒天数必须是数字", "BAD_DAYS", 400)
+        token_in = optional_text_field(body, "token")
+        chat_id = text_field(body, "chatId")
+        if token_in is None or chat_id is None:
+            return api_fail("Telegram 配置字段格式不正确", "BAD_BODY", 400)
+        enc = row["tg_token"] if token_in == "" else encrypt_secret(token_in)
         get_db().execute(
             """UPDATE settings SET tg_enabled=?, tg_token=?, tg_chat_id=?,
                tg_reminder_enabled=?, tg_days_before=? WHERE id=1""",
             (
-                1 if body.get("enabled") else 0,
+                1 if parse_bool(body.get("enabled")) else 0,
                 enc,
-                (body.get("chatId") or "").strip(),
-                1 if body.get("reminderEnabled") else 0,
-                max(int(body.get("daysBefore") or 3), 0),
+                chat_id,
+                1 if parse_bool(body.get("reminderEnabled")) else 0,
+                reminder_days,
             ),
         )
         get_db().commit()
@@ -827,7 +857,9 @@ self.addEventListener('fetch',e=>{
         if err:
             return err
         body = request.get_json(silent=True) or {}
-        token = (body.get("token") or "").strip()
+        token = optional_text_field(body, "token")
+        if token is None:
+            return api_fail("Bot Token 必须是字符串", "BAD_BODY", 400)
         if not token:
             row = get_settings()
             token = decrypt_secret(row["tg_token"]) if row["tg_token"] else ""
@@ -861,7 +893,8 @@ self.addEventListener('fetch',e=>{
         update = request.get_json(silent=True) or {}
         msg = update.get("message") or update.get("edited_message") or {}
         chat = msg.get("chat") or {}
-        text = (msg.get("text") or "").strip()
+        raw_text = msg.get("text") or ""
+        text = raw_text.strip() if isinstance(raw_text, str) else ""
         cfg = tg_config()
         # 只响应配置的 Chat ID
         if not cfg["chat_id"] or str(chat.get("id")) != str(cfg["chat_id"]):
@@ -1031,7 +1064,7 @@ def api_guard(need_json=True):
 
 
 def now_iso():
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 # --- 登录限流（内存级，防暴力破解）---
@@ -1137,11 +1170,11 @@ def smtp_config():
     host = (row["smtp_host"] if row else "") or os.environ.get("SMTP_HOST", "")
     username = (row["smtp_username"] if row else "") or os.environ.get("SMTP_USERNAME", "")
     password = decrypt_secret(row["smtp_password"]) if row and row["smtp_password"] else os.environ.get("SMTP_PASSWORD", "")
-    port = (row["smtp_port"] if row and row["smtp_port"] else None) or int(os.environ.get("SMTP_PORT") or 465)
+    port = parse_port((row["smtp_port"] if row and row["smtp_port"] else None) or os.environ.get("SMTP_PORT"), 465) or 465
     recipient = (row["recipient"] if row else "") or username
     return {
         "host": host,
-        "port": int(port),
+        "port": port,
         "username": username,
         "password": password,
         "sender": username or os.environ.get("SMTP_FROM", ""),
@@ -1332,9 +1365,9 @@ def run_due_reminders():
 
     channels = []
     if email_on:
-        channels.append(("email", max(int(row["reminder_days_before"] or 3), 0)))
+        channels.append(("email", parse_int(row["reminder_days_before"], 3)))
     if tg_on:
-        channels.append(("telegram", max(int(row["tg_days_before"] or 3), 0)))
+        channels.append(("telegram", parse_int(row["tg_days_before"], 3)))
     recipient = smtp_config()["recipient"]
 
     for card in load_cards({}):
@@ -1656,9 +1689,10 @@ def row_to_dto(row):
     for key in DTO_FIELDS:
         if key == "tags":
             try:
-                dto[key] = json.loads(row["tags_json"] or "[]")
+                parsed = json.loads(row["tags_json"] or "[]")
             except json.JSONDecodeError:
-                dto[key] = []
+                parsed = []
+            dto[key] = parsed if isinstance(parsed, list) else []
             continue
         column = DTO_TO_COL.get(key)
         value = row[column] if column else None
@@ -1838,6 +1872,31 @@ def parse_int(value, default):
         return default
 
 
+def parse_nonnegative_int_field(value, default):
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool):
+        return None
+    try:
+        return max(int(value), 0)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_port(value, default=None):
+    if value in (None, ""):
+        value = default
+    if isinstance(value, bool):
+        return None
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        return None
+    if 1 <= port <= 65535:
+        return port
+    return None
+
+
 def parse_optional_int(value):
     if value in (None, ""):
         return None
@@ -1853,6 +1912,27 @@ def parse_bool(value):
     if isinstance(value, int):
         return value != 0
     return str(value).lower() in {"1", "true", "yes", "on"}
+
+
+_MISSING = object()
+
+
+def text_field(body, key, default="", strip=True):
+    value = body.get(key, _MISSING)
+    if value is _MISSING or value is None:
+        return default
+    if not isinstance(value, str):
+        return None
+    return value.strip() if strip else value
+
+
+def optional_text_field(body, key, strip=True):
+    value = body.get(key, _MISSING)
+    if value is _MISSING or value is None:
+        return ""
+    if not isinstance(value, str):
+        return None
+    return value.strip() if strip else value
 
 
 def blank_none(value):
