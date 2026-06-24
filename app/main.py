@@ -455,6 +455,8 @@ def create_app():
         if err:
             return err
         dto = normalize_dto(request.get_json(silent=True) or {})
+        if not dto.get("carrier"):
+            return api_fail("运营商名称不能为空", "CARRIER_REQUIRED", 400)
         dto["id"] = str(uuid.uuid4())
         dto["orderIndex"] = next_order_index()
         insert_card(dto)
@@ -976,6 +978,7 @@ def init_db():
             ALTER TABLE activity_log_new RENAME TO activity_log;
             """
         )
+    migrate_bad_card_ids()
     get_db().commit()
     g._db_initialized = True
 
@@ -1469,14 +1472,44 @@ def default_dto():
 
 
 _SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+# 这些值即使符合字符集，作为 JS 对象 key 也会命中 Object 原型链，
+# 导致前端 cardEls[id] 读到原型上的函数而非 undefined / DOM，后续 querySelector 崩溃。
+_RESERVED_IDS = {
+    "__proto__", "prototype", "constructor", "toString", "toLocaleString",
+    "valueOf", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable",
+    "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__",
+}
 
 
 def safe_card_id(value):
-    """只接受安全格式的卡片 ID（字母/数字/下划线/连字符）。
-    非法 ID（如含引号、尖括号的注入串）一律丢弃，交由调用方重新生成 UUID，
-    避免恶意 ID 持久化后被前端拼进 DOM / 选择器造成 XSS。"""
+    """只接受安全格式的卡片 ID（字母/数字/下划线/连字符），并拒绝原型保留字。
+    非法 ID（注入串或 __proto__ 等保留 key）一律丢弃，交由调用方重新生成 UUID，
+    避免被前端拼进 DOM / 选择器（XSS）或污染对象原型链（列表崩溃）。"""
     text = str(value or "").strip()
-    return text if _SAFE_ID_RE.match(text) else ""
+    if not _SAFE_ID_RE.match(text) or text in _RESERVED_IDS:
+        return ""
+    return text
+
+
+_legacy_ids_done = False
+
+
+def migrate_bad_card_ids():
+    """一次性清理旧库里的非法卡片 ID（含 / 引号 __proto__ 等）：改成新 UUID，
+    并同步 activity_log / reminder_log 的引用。每进程只跑一次。"""
+    global _legacy_ids_done
+    if _legacy_ids_done:
+        return
+    _legacy_ids_done = True
+    db = get_db()
+    for row in db.execute("SELECT id FROM cards").fetchall():
+        old = row["id"]
+        if safe_card_id(old) == old:
+            continue
+        new = str(uuid.uuid4())
+        db.execute("UPDATE cards SET id = ? WHERE id = ?", (new, old))
+        db.execute("UPDATE activity_log SET card_id = ? WHERE card_id = ?", (new, old))
+        db.execute("UPDATE reminder_log SET card_id = ? WHERE card_id = ?", (new, old))
 
 
 def normalize_dto(data, existing=None):

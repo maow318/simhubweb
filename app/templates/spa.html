@@ -263,7 +263,7 @@ const LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAA
 document.querySelectorAll(".logo").forEach(e=>{e.textContent="";const i=document.createElement("img");i.src=LOGO;e.appendChild(i);});
 let token=sessionStorage.getItem('simhub_token')||'';
 let cards=[]; let view='overview'; let revealed=new Set(); let selectMode=false; let selected=new Set(); let settingsPage='home';
-let cardEls={}; let gridEl=null; let emptyEl=null;
+let cardEls=Object.create(null); let gridEl=null; let emptyEl=null;
 let filterTags=new Set(); let filterFrom=''; let filterTo=''; let advOpen=false;
 let maskDefault = localStorage.getItem('simhub_mask')!=='off';
 const EYE='<svg><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
