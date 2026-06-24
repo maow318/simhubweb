@@ -157,6 +157,8 @@ def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
     app.config["DATABASE"] = os.environ.get("DATABASE") or os.path.join(BASE_DIR, "..", "data", "simhub.sqlite")
+    # 仅当部署在可信反代后（由它覆盖 X-Forwarded-For）时才信任转发头取客户端 IP
+    app.config["TRUST_PROXY"] = (os.environ.get("TRUST_PROXY", "") or "").lower() in ("1", "true", "yes", "on")
 
     @app.before_request
     def before_request():
@@ -294,10 +296,12 @@ def create_app():
     @app.route("/")
     @login_required
     def dashboard():
+        # 到期提醒在首页访问时顺带触发（无后台调度时的兜底）。
+        # 不再静默吞异常——失败会记进日志，便于排查；建议另配 cron 定时触发（见 README）。
         try:
             run_due_reminders()
         except Exception:
-            pass
+            app.logger.exception("run_due_reminders failed on dashboard visit")
         return Response(render_spa(), mimetype="text/html; charset=utf-8")
 
     @app.route("/cards/new", methods=["GET", "POST"])
@@ -427,12 +431,16 @@ def create_app():
 
     @app.route("/api/status")
     def api_status():
-        cards = load_cards({}) if user_count() else []
+        device_name = os.environ.get("SIMHUB_DEVICE_NAME", "SimHub Keeper Linux")
+        # 未登录时不泄露真实卡片数量与数据版本
+        if not g.user:
+            return api_ok({"deviceName": device_name, "connectedDevices": 0})
+        cards = load_cards({})
         updated = max((parse_iso(c.get("updatedAt")) or datetime.fromtimestamp(0, tz=timezone.utc) for c in cards), default=datetime.fromtimestamp(0, tz=timezone.utc))
         return api_ok(
             {
-                "deviceName": os.environ.get("SIMHUB_DEVICE_NAME", "SimHub Keeper Linux"),
-                "connectedDevices": 1 if g.user else 0,
+                "deviceName": device_name,
+                "connectedDevices": 1,
                 "dataVersion": updated.timestamp(),
                 "cardCount": len(cards),
             }
@@ -443,6 +451,9 @@ def create_app():
     def api_cards():
         if request.method == "GET":
             return api_ok(load_cards({}))
+        err = api_guard()
+        if err:
+            return err
         dto = normalize_dto(request.get_json(silent=True) or {})
         dto["id"] = str(uuid.uuid4())
         dto["orderIndex"] = next_order_index()
@@ -458,11 +469,17 @@ def create_app():
         if request.method == "GET":
             return api_ok(card)
         if request.method == "DELETE":
+            err = api_guard(need_json=False)
+            if err:
+                return err
             get_db().execute("DELETE FROM cards WHERE id = ?", (card_id,))
             log_activity(card_id, "delete", "删除卡片", label=card.get("carrier") or "未命名")
             get_db().commit()
             return api_ok({"deleted": True})
 
+        err = api_guard()
+        if err:
+            return err
         dto = normalize_dto(request.get_json(silent=True) or {}, existing=card)
         dto["id"] = card_id
         update_card(card_id, dto)
@@ -473,6 +490,9 @@ def create_app():
     @app.route("/api/cards/batch-update", methods=["POST"])
     @login_required
     def api_batch_update():
+        err = api_guard()
+        if err:
+            return err
         body = request.get_json(silent=True) or {}
         ids = [item for item in body.get("ids", []) if isinstance(item, str)]
         action = body.get("action", "")
@@ -513,6 +533,9 @@ def create_app():
     @app.route("/api/import", methods=["POST"])
     @login_required
     def api_import():
+        err = api_guard()
+        if err:
+            return err
         body = request.get_json(silent=True) or {}
         raw_cards = body.get("cards", [])
         if not isinstance(raw_cards, list):
@@ -645,6 +668,9 @@ self.addEventListener('fetch',e=>{
     @app.route("/api/password", methods=["POST"])
     @login_required
     def api_password():
+        err = api_guard()
+        if err:
+            return err
         body = request.get_json(silent=True) or {}
         current = body.get("current", "")
         new_password = body.get("new", "")
@@ -685,6 +711,9 @@ self.addEventListener('fetch',e=>{
     @app.route("/api/smtp", methods=["POST"])
     @login_required
     def api_smtp_save():
+        err = api_guard()
+        if err:
+            return err
         body = request.get_json(silent=True) or {}
         host = (body.get("host") or "").strip()
         username = (body.get("username") or "").strip()
@@ -726,6 +755,9 @@ self.addEventListener('fetch',e=>{
     @app.route("/api/smtp/test", methods=["POST"])
     @login_required
     def api_smtp_test():
+        err = api_guard(need_json=False)
+        if err:
+            return err
         cfg = smtp_config()
         target = cfg["recipient"] or cfg["username"]
         if not target:
@@ -759,6 +791,9 @@ self.addEventListener('fetch',e=>{
     @app.route("/api/tg", methods=["POST"])
     @login_required
     def api_tg_save():
+        err = api_guard()
+        if err:
+            return err
         body = request.get_json(silent=True) or {}
         row = get_settings()
         token_in = body.get("token")
@@ -786,6 +821,9 @@ self.addEventListener('fetch',e=>{
     @app.route("/api/tg/chatid", methods=["POST"])
     @login_required
     def api_tg_chatid():
+        err = api_guard()
+        if err:
+            return err
         body = request.get_json(silent=True) or {}
         token = (body.get("token") or "").strip()
         if not token:
@@ -804,6 +842,9 @@ self.addEventListener('fetch',e=>{
     @app.route("/api/tg/test", methods=["POST"])
     @login_required
     def api_tg_test():
+        err = api_guard(need_json=False)
+        if err:
+            return err
         try:
             tg_send("✅ 这是一条来自 SIMHUB Web 的测试消息，收到说明配置正确。")
         except Exception as exc:
@@ -842,6 +883,14 @@ self.addEventListener('fetch',e=>{
         if request.path.startswith("/api/"):
             return api_fail("未找到资源", "NOT_FOUND", 404)
         return render_template("404.html"), 404
+
+    @app.cli.command("send-reminders")
+    def send_reminders_cmd():
+        """扫描并发送到期提醒，供 cron 等定时任务调用，不依赖有人打开网页。
+        用法：flask --app app.main send-reminders"""
+        init_db()
+        run_due_reminders()
+        print("reminders scan done")
 
     return app
 
@@ -954,10 +1003,28 @@ def csrf_token():
     return token
 
 
+def csrf_is_valid():
+    """CSRF token 可来自表单字段 csrf_token 或请求头 X-CSRF-Token。"""
+    token = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
+    return bool(token) and secrets.compare_digest(token, csrf_token())
+
+
 def validate_csrf():
-    token = request.form.get("csrf_token")
-    if not token or not secrets.compare_digest(token, csrf_token()):
+    if not csrf_is_valid():
         abort(400, "Invalid CSRF token")
+
+
+def api_guard(need_json=True):
+    """会修改状态的 JSON API 统一防护：校验 CSRF，并按需校验请求体是 JSON 对象。
+    返回错误响应（应直接 return）或 None（通过）。"""
+    if not csrf_is_valid():
+        return api_fail("CSRF 校验失败", "CSRF", 403)
+    if need_json:
+        if not request.is_json:
+            return api_fail("需要 application/json 请求体", "NOT_JSON", 415)
+        if not isinstance(request.get_json(silent=True), dict):
+            return api_fail("请求体必须是 JSON 对象", "BAD_BODY", 400)
+    return None
 
 
 def now_iso():
@@ -971,10 +1038,13 @@ _login_fails = {}
 
 
 def client_ip():
-    """取真实客户端 IP（在 Caddy/nginx 反代后用 X-Forwarded-For 首段）。"""
-    fwd = request.headers.get("X-Forwarded-For", "")
-    if fwd:
-        return fwd.split(",")[0].strip()
+    """取客户端 IP。默认用 request.remote_addr；只有显式开启 TRUST_PROXY
+    （部署在会覆盖 X-Forwarded-For 的可信反代后）时，才采用转发头首段，
+    避免裸 Flask 下被伪造的 X-Forwarded-For 绕过登录限流。"""
+    if app.config.get("TRUST_PROXY"):
+        fwd = request.headers.get("X-Forwarded-For", "")
+        if fwd:
+            return fwd.split(",")[0].strip()
     return request.remote_addr or "unknown"
 
 
@@ -1253,10 +1323,9 @@ def run_due_reminders():
     if not (email_on or tg_on):
         return
     today = date.today().isoformat()
-    if row["last_reminder_date"] == today:
-        return
-    get_db().execute("UPDATE settings SET last_reminder_date = ? WHERE id = 1", (today,))
-    get_db().commit()
+    # 不在发送前就标记“今天已跑”，否则失败的提醒当天无法重试。
+    # 去重完全交给 reminder_log(card_id, sent_date, channel)：成功才记一笔，
+    # 失败不记，下次扫描仍会重试未成功的卡片/渠道。
 
     channels = []
     if email_on:
@@ -1297,6 +1366,8 @@ def run_due_reminders():
                 "INSERT OR IGNORE INTO reminder_log (card_id, sent_date, channel) VALUES (?, ?, ?)",
                 (card["id"], today, channel),
             )
+    # 记录最近一次扫描日期（仅供展示/诊断，不用于阻止当天重试）
+    get_db().execute("UPDATE settings SET last_reminder_date = ? WHERE id = 1", (today,))
     get_db().commit()
 
 
@@ -1397,6 +1468,17 @@ def default_dto():
     )
 
 
+_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def safe_card_id(value):
+    """只接受安全格式的卡片 ID（字母/数字/下划线/连字符）。
+    非法 ID（如含引号、尖括号的注入串）一律丢弃，交由调用方重新生成 UUID，
+    避免恶意 ID 持久化后被前端拼进 DOM / 选择器造成 XSS。"""
+    text = str(value or "").strip()
+    return text if _SAFE_ID_RE.match(text) else ""
+
+
 def normalize_dto(data, existing=None):
     base = dict(existing or default_dto_raw())
     base.update(data or {})
@@ -1407,7 +1489,7 @@ def normalize_dto(data, existing=None):
     renew_days = parse_int(base.get("renewDays"), inferred_days(activation, expiry))
 
     dto = {
-        "id": str(base.get("id") or ""),
+        "id": safe_card_id(base.get("id")),
         "carrier": str(base.get("carrier") or "").strip(),
         "plan": str(base.get("plan") or "").strip(),
         "phoneNumber": str(base.get("phoneNumber") or "").strip(),

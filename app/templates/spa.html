@@ -285,7 +285,7 @@ function confirmDelete(message,onConfirm,confirmText='删除'){
 function maskPhone(p){if(!p)return '—';const d=String(p).replace(/\s/g,'');if(d.length<=2)return '••';return '•••• '+d.slice(-2);}
 
 async function api(path,opts={}){
-  opts.headers=Object.assign({'Content-Type':'application/json'},opts.headers||{});
+  opts.headers=Object.assign({'Content-Type':'application/json','X-CSRF-Token':CSRF},opts.headers||{});
   opts.credentials='same-origin';
   const ctrl=new AbortController();const tid=setTimeout(()=>ctrl.abort(),8000);opts.signal=ctrl.signal;
   let res;
@@ -349,7 +349,7 @@ function renderOverview(){
       <div class="stat"><div class="n">●</div><div class="l">服务运行中</div></div>
     </div>
     <div class="panel"><h3>国家 / 地区分布</h3>${top.map(([k,v])=>`<div class="bar"><span style="width:90px">${esc(k)}</span><div class="track"><div class="fill" style="width:${v/max*100}%"></div></div><span>${v}</span></div>`).join('')||'<span class="sub">暂无数据</span>'}</div>
-    <div class="panel"><h3>最近修改</h3>${recent.map(c=>`<div class="recent"><span>${c.flag||'🌐'} ${esc(c.carrier||'未命名')}</span><span class="sub">${c.updatedAt?new Date(c.updatedAt).toLocaleString():''}</span></div>`).join('')||'<span class="sub">暂无</span>'}</div>
+    <div class="panel"><h3>最近修改</h3>${recent.map(c=>`<div class="recent"><span>${esc(c.flag||'🌐')} ${esc(c.carrier||'未命名')}</span><span class="sub">${c.updatedAt?new Date(c.updatedAt).toLocaleString():''}</span></div>`).join('')||'<span class="sub">暂无</span>'}</div>
     <div class="panel"><h3>最近活动</h3><div class="acts" id="actList"><span class="sub">加载中…</span></div></div>`;
   loadActivity();
 }
@@ -367,8 +367,8 @@ function cardContentInner(c){
   const d=daysLeft(c);let badge='';if(d<0)badge='<span class="badge exp">已过期</span>';else if(d<=7)badge='<span class="badge soon">'+d+'天</span>';
   const rev=revealed.has(c.id)||!maskDefault;
   const phoneTxt=c.phoneNumber?(rev?esc(c.phoneNumber):maskPhone(c.phoneNumber)):'—';
-  const eye=c.phoneNumber?`<button class="iconbtn eyebtn" data-id="${c.id}" onclick="event.stopPropagation();toggleEye('${c.id}')">${rev?EYEOFF:EYE}</button>`:'';
-  const icon=c.carrierAppIconURLString?`<img src="${esc(c.carrierAppIconURLString)}" class="appicon" style="width:30px;height:30px">`:`<span class="flag">${c.flag||'🌐'}</span>`;
+  const eye=c.phoneNumber?`<button class="iconbtn eyebtn">${rev?EYEOFF:EYE}</button>`:'';
+  const icon=c.carrierAppIconURLString?`<img src="${esc(c.carrierAppIconURLString)}" class="appicon" style="width:30px;height:30px">`:`<span class="flag">${esc(c.flag||'🌐')}</span>`;
   return `${icon}
     <h3>${esc(c.carrier||'未命名')} ${badge}</h3>
     <div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div>
@@ -378,8 +378,11 @@ function ensureCardEl(c){
   let el=cardEls[c.id];
   if(!el){
     el=document.createElement('div');el.dataset.id=c.id;
-    el.innerHTML=`<div class="card-content"></div><div class="selcheck"></div><button class="iconbtn moreBtn" onclick="event.stopPropagation();openDetailById('${c.id}')" aria-label="详情">⋯</button>`;
-    el.addEventListener('click',()=>{if(selectMode)toggleSel(el.dataset.id);});
+    el.innerHTML=`<div class="card-content"></div><div class="selcheck"></div><button class="iconbtn moreBtn" aria-label="详情">⋯</button>`;
+    el.addEventListener('click',(ev)=>{const id=el.dataset.id;
+      if(ev.target.closest('.eyebtn')){ev.stopPropagation();toggleEye(id);return;}
+      if(ev.target.closest('.moreBtn')){ev.stopPropagation();openDetailById(id);return;}
+      if(selectMode)toggleSel(id);});
     cardEls[c.id]=el;
   }
   return el;
@@ -705,7 +708,7 @@ function openDrawer(card){
   if(!isNew)dG('delBtn2').onclick=()=>delCard(card);
 }
 function refreshAppRow(){const d=drawerData;dG('appRow').innerHTML=d.carrierAppIconURLString?`<img src="${esc(d.carrierAppIconURLString)}" class="appicon"><span>${esc(d.carrierAppName||'已选图标')}</span><span class="chev">›</span>`:`<span class="ph">从 App Store 选择图标</span><span class="chev">›</span>`;}
-function refreshCountryRow(){const d=drawerData;dG('countryRow').innerHTML=`<span style="font-size:20px">${d.flag||'🌐'}</span><span>${esc(d.countryName||'选择国家 / 地区')}</span><span class="chev">›</span>`;}
+function refreshCountryRow(){const d=drawerData;dG('countryRow').innerHTML=`<span style="font-size:20px">${esc(d.flag||'🌐')}</span><span>${esc(d.countryName||'选择国家 / 地区')}</span><span class="chev">›</span>`;}
 function refreshBgRow(){const d=drawerData;const bg=bgByAsset[d.cardBackgroundAssetName];dG('bgRow').innerHTML=bg?`<img src="${esc(bg)}" class="appicon" style="object-fit:cover"><span>${esc(d.countryName||'已选背景')}</span><span class="chev">›</span>`:`<span class="ph">默认（无背景图）</span><span class="chev">›</span>`;}
 function updateSummary(){const s=dG('f_start').value,e=dG('f_expiry').value;dG('daySummary').textContent=(s&&e)?`开始 ${s} → 到期 ${e}（${daySpan(new Date(s),new Date(e))} 天）`:'';}
 
@@ -746,7 +749,7 @@ function openDetail(card){
   const tags=(c.tags||[]).join('、');
   const close=()=>document.getElementById('drawerHost').innerHTML='';
   document.getElementById('drawerHost').innerHTML=`<div class="scrim center"><div class="modalBox">
-    <div class="detailHead"><span style="font-size:34px">${c.flag||'🌐'}</span>
+    <div class="detailHead"><span style="font-size:34px">${esc(c.flag||'🌐')}</span>
       <div><h2 style="margin:0">${esc(c.carrier||'未命名')}</h2><div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div></div></div>
     ${detailRow('电话号码',c.phoneNumber)}
     ${detailRow('套餐',c.plan)}
@@ -791,7 +794,7 @@ async function openCountryPicker(){
     <div class="pickerList" id="pkList"></div></div></div>`;
   const draw=()=>{const q=dG('pkSearch').value.toLowerCase();
     dG('pkList').innerHTML=countriesCache.filter(c=>!q||[c.name,c.english,c.code,c.calling].join(' ').toLowerCase().includes(q)).slice(0,400)
-      .map(c=>`<div class="pkItem" data-code="${c.code}"><span style="font-size:22px">${c.flag||'🌐'}</span><div><div>${esc(c.name)}</div><div class="sub">${c.code} · +${c.calling||''} · ${esc(c.english||'')}</div></div></div>`).join('');
+      .map(c=>`<div class="pkItem" data-code="${c.code}"><span style="font-size:22px">${esc(c.flag||'🌐')}</span><div><div>${esc(c.name)}</div><div class="sub">${c.code} · +${c.calling||''} · ${esc(c.english||'')}</div></div></div>`).join('');
     dG('pkList').querySelectorAll('.pkItem').forEach(el=>el.onclick=()=>{const c=countriesCache.find(x=>x.code===el.dataset.code);drawerData.countryCode=c.code;drawerData.countryName=c.name;drawerData.flag=c.flag||'🌐';drawerData.cardBackgroundAssetName=c.bgAsset||'';refreshCountryRow();refreshBgRow();host.innerHTML='';});};
   dG('pkSearch').addEventListener('input',draw);dG('pkClose').onclick=()=>host.innerHTML='';
   host.querySelector('.scrim').onclick=e=>{if(e.target.classList.contains('scrim'))host.innerHTML='';};draw();

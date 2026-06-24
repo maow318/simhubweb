@@ -39,9 +39,19 @@
 - **数据完全本地化**：所有卡片存在你自己服务器的 SQLite（Docker 卷 `simhub-data`），不上传任何第三方。
 - **登录密码**：`pbkdf2:sha256` 哈希存储，不可逆。
 - **SMTP 授权码**：用 `SECRET_KEY` 派生密钥加密后存库（非明文）。请务必固定 `SECRET_KEY`，否则重启后解不开需重填。
-- **登录限流**：连续失败进入冷却，配合可选的邮箱两步验证防爆破。
+- **登录限流**：连续失败进入冷却，配合可选的邮箱/Telegram 两步验证防爆破。默认按 `request.remote_addr` 计数；只有部署在**会覆盖 `X-Forwarded-For` 的可信反代**后，才设 `TRUST_PROXY=1` 让它信任转发头取真实 IP，否则裸 Flask 下伪造的 `X-Forwarded-For` 可绕过限流。
+- **CSRF**：所有改状态的 JSON API 需带 `X-CSRF-Token` 头（SPA 自动携带），且只接受 `application/json` 请求体；`text/plain` / 空 body 不会改状态。
 - **传输加密**：生产环境请走 HTTPS（见下方 Caddy 部署），不要让登录走公网明文 HTTP。
 - 卡片里的 SM-DP+ / 激活码 / EID 等敏感字段当前以明文存于本机数据库，安全性依赖服务器自身（建议磁盘加密 + 严格文件权限 + 定期备份）。
+
+> 到期提醒说明：提醒在**有人访问首页**时顺带触发（无后台调度时的兜底）。要不依赖访问、可靠定时提醒，请配一个 cron 定时调用：
+>
+> ```bash
+> # 每天 9 点扫描并发送（Docker 部署示例）
+> 0 9 * * * docker exec simhub-keeper flask --app app.main send-reminders
+> ```
+>
+> 提醒去重依赖 `reminder_log(card_id, sent_date, channel)`：成功才记一笔，失败不记，同一天会重试未成功的提醒。
 
 ## 部署
 
