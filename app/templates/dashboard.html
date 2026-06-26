@@ -124,7 +124,7 @@
             <button type="submit">完成续期</button>
           </form>
           <a class="secondary-action" href="{{ url_for('edit_card', card_id=card.id) }}">编辑</a>
-          <form method="post" action="{{ url_for('delete_card_route', card_id=card.id) }}" onsubmit="return confirm('确定删除这张卡片吗？')">
+          <form method="post" action="{{ url_for('delete_card_route', card_id=card.id) }}" data-confirm="确定删除这张卡片吗？">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="danger-button" type="submit">删除</button>
           </form>
@@ -139,4 +139,11 @@
     <a class="primary-action" href="{{ url_for('new_card') }}">添加卡片</a>
   </section>
 {% endif %}
+<script nonce="{{ csp_nonce() }}">
+document.querySelectorAll("form[data-confirm]").forEach(form=>{
+  form.addEventListener("submit",event=>{
+    if(!confirm(form.dataset.confirm||"确定继续吗？"))event.preventDefault();
+  });
+});
+</script>
 {% endblock %}

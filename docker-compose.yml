@@ -9,3 +9,17 @@ services:
     volumes:
       - ./data:/data
     restart: unless-stopped
+
+  simhub-reminders:
+    build: .
+    container_name: simhub-reminders
+    command: python -m app.reminder_worker
+    env_file:
+      - .env
+    environment:
+      - REMINDER_SCAN_INTERVAL_SECONDS=${REMINDER_SCAN_INTERVAL_SECONDS:-3600}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    depends_on:
+      - simhub-keeper

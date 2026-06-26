@@ -1,152 +1,242 @@
 # SIMHUB Web
 
-独立版 Linux 自托管 Web 端，用来管理 SIM/eSIM **保号卡片**——记录运营商、号码、套餐、到期日，临近到期提醒续费，避免号码被注销。
+SIMHUB Web 是一个自托管的 SIM / eSIM 卡片管理后台，用来记录运营商、号码、套餐、国家/地区、到期时间、续费成本、LPA 信息和提醒状态。它适合长期维护保号卡、旅行卡、备用号码和各类 eSIM 资料。
 
-## 项目定位
+当前版本是面向 Linux / Docker 的独立 Web 版本，数据保存在自己的 SQLite 数据库里，不依赖第三方云服务。
 
-这是 iOS App [`maow318/simhub`](https://github.com/maow318) 内置 Web 管理端的**独立 Linux 版本**，字段与 JSON 格式和 App 完全对齐：
+## 功能概览
 
-- 前端参考：`esimSubscription/WebManagement/simhubweb.html`
-- API 参考：`esimSubscription/WebManagement/WebAPIController.swift`
-- 数据结构参考：`esimSubscription/ESIMCard.swift` 里的 `ESIMCardDTO`
+- 账户初始化、登录、修改用户名、修改密码
+- 概览面板：卡片总数、7 天内到期、已过期、风险项、费用估算、90 天到期时间线
+- 卡片管理：卡片视图 / 列表视图、搜索、国家筛选、状态筛选、批量编辑、批量删除
+- 卡片详情：运营商、国家/地区、号码、套餐、价格、备注、官网、App Store 入口、LPA / EID 信息
+- 国旗背景卡片：按国家/地区自动匹配卡片背景，可清除或手动设置
+- eSIM 解析器：支持手动输入、二维码图片识别、摄像头扫描，生成 LPA 字符串和二维码
+- 导入导出：JSON / CSV 导入导出，导入前预览，兼容 App 备份格式
+- 通知提醒：邮件、Telegram、Webhook，到期提醒和单卡操作提醒
+- 提醒历史和最近活动清理
+- 深色 / 浅色主题，浅色玻璃拟态 UI
+- Docker Compose、HTTPS Caddy、systemd + nginx 部署方式
 
-**和 App 的关系 / 数据同步**：本 Web 端是**自成一体**的，自己的 SQLite 数据库就是数据源，**不与 App 实时双向同步**。两端互通靠**JSON 导入/导出**（格式一致，可来回搬运）。同一台服务器上多个浏览器之间，靠每 4 秒轮询 `/api/status` 做到近实时刷新——任一端改动，其它端自动重载。
+> 第三方运营商转换工具当前未包含在正式 UI 中，后续等流程稳定后再考虑加入。
 
-## 功能
+## 项目结构
 
-- 首次启动创建管理员账号；密码登录，所有后台页面必须登录
-- **登录限流**：同一 IP 连续登录失败会进入冷却，防暴力破解
-- **邮件功能**（对齐 App「邮件提醒」，在「设置」里自己填 SMTP，无需改服务端）
-  - 登录两步验证：开启后登录需「密码 + 邮箱一次性验证码」
-  - 卡片到期提醒：临近到期自动发邮件（可设提前天数，每张卡每天最多一封）
-  - 服务商下拉自动带出服务器/端口、可寄测试邮件；授权码用 `SECRET_KEY` 加密后存库，不明文落盘
-- 单页管理端（SPA）：概览、卡片管理、导入导出、设置
-- 概览面板：卡片总数 / 7 天内到期 / 已过期统计，国家分布、最近修改
-- 卡片详情视图 + 居中弹窗编辑；右上角 ⋯ 进详情，详情内再编辑
-- **国旗光效卡片背景**：每张卡按国家显示对应背景图（166 国），遮罩随主题自适应，可手动换/清除
-- 国家/地区选择器（252 个 ISO 地区，国旗 + 中英文名 + 区号搜索）
-- **JSON 导入兼容**：国家代码 ↔ 国旗 ↔ 名称 ↔ 卡片背景自动互相补全，从 App 备份导入即带正确国旗与背景
-- App Store 图标搜索（后端代理 Apple iTunes Search API，按国家 storefront）
-- 批量编辑：多选后批量打标签 / 批量删除
-- 电话号码默认打码，可单独点眼睛显示
-- 深色 / 浅色主题切换
-- 数据备份入口（设置内一键导出 JSON + 卷备份说明）
-- JSON / CSV 导入导出（导入前预览、去重后写入）
-- Docker / Docker Compose（含 HTTPS）/ systemd + nginx 多种部署
+```text
+app/
+  main.py                 Flask 后端、API、提醒逻辑
+  schema.sql              SQLite 表结构
+  reminder_worker.py      Docker 后台提醒 worker
+  countries.py            国家/地区和国旗背景映射
+  templates/spa.html      主单页后台
+  static/                 图标、背景、PWA 资源
+docker-compose.yml        本地 / 内网 HTTP 部署
+docker-compose.prod.yml   生产 HTTPS + Caddy 部署
+Dockerfile                应用镜像
+systemd/                  裸机部署服务文件
+nginx/                    裸机反代示例
+```
 
-## 隐私与安全
+## 快速部署
 
-- **数据完全本地化**：所有卡片存在你自己服务器的 SQLite（Docker 卷 `simhub-data`），不上传任何第三方。
-- **登录密码**：`pbkdf2:sha256` 哈希存储，不可逆。
-- **SMTP 授权码**：用 `SECRET_KEY` 派生密钥加密后存库（非明文）。请务必固定 `SECRET_KEY`，否则重启后解不开需重填。
-- **登录限流**：连续失败进入冷却，配合可选的邮箱/Telegram 两步验证防爆破。默认按 `request.remote_addr` 计数；只有部署在**会覆盖 `X-Forwarded-For` 的可信反代**后，才设 `TRUST_PROXY=1` 让它信任转发头取真实 IP，否则裸 Flask 下伪造的 `X-Forwarded-For` 可绕过限流。
-- **CSRF**：所有改状态的 JSON API 需带 `X-CSRF-Token` 头（SPA 自动携带），且只接受 `application/json` 请求体；`text/plain` / 空 body 不会改状态。
-- **传输加密**：生产环境请走 HTTPS（见下方 Caddy 部署），不要让登录走公网明文 HTTP。
-- 卡片里的 SM-DP+ / 激活码 / EID 等敏感字段当前以明文存于本机数据库，安全性依赖服务器自身（建议磁盘加密 + 严格文件权限 + 定期备份）。
+### 生产环境 HTTPS
 
-> 到期提醒说明：提醒在**有人访问首页**时顺带触发（无后台调度时的兜底）。要不依赖访问、可靠定时提醒，请配一个 cron 定时调用：
->
-> ```bash
-> # 每天 9 点扫描并发送（Docker 部署示例）
-> 0 9 * * * docker exec simhub-keeper flask --app app.main send-reminders
-> ```
->
-> 提醒去重依赖 `reminder_log(card_id, sent_date, channel)`：成功才记一笔，失败不记，同一天会重试未成功的提醒。
-
-## 部署
-
-### 方式一：生产 HTTPS（推荐，Caddy 自动签证书）
-
-前提：有一个域名，其 DNS A 记录已指向本服务器，且服务器 80/443 端口可达。
+准备一个域名，并让 DNS A 记录指向服务器。然后：
 
 ```bash
 cp .env.example .env
-# 生成并填入 SECRET_KEY；把 SIMHUB_DOMAIN 改成你的域名
-python3 -c "import secrets;print('SECRET_KEY='+secrets.token_urlsafe(48))"
 
+python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(48))"
+python3 -c "import secrets; print('DATA_ENCRYPTION_KEY=' + secrets.token_urlsafe(48))"
+```
+
+把生成的 `SECRET_KEY`、`DATA_ENCRYPTION_KEY` 写入 `.env`，并把 `SIMHUB_DOMAIN` 改成你的域名：
+
+```env
+SECRET_KEY=请替换为固定随机值
+DATA_ENCRYPTION_KEY=请替换为另一个固定随机值
+SIMHUB_DOMAIN=simhub.example.com
+SESSION_COOKIE_SECURE=1
+ENABLE_HSTS=1
+```
+
+启动：
+
+```bash
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Caddy 会自动为 `SIMHUB_DOMAIN` 签发 Let's Encrypt 证书并强制 HTTPS。访问 `https://你的域名`，第一次打开会要求创建管理员。
+Caddy 会自动申请 HTTPS 证书。首次访问 `https://你的域名` 时会进入管理员创建流程。
 
-### 方式二：纯 HTTP（仅本地 / 内网测试）
+### 本地或内网测试
 
 ```bash
-cp .env.example .env   # 填好 SECRET_KEY
+cp .env.example .env
 docker compose up -d --build
-# 访问 http://服务器IP:8080
 ```
 
-> ⚠️ 公网请勿只用 HTTP——登录密码会明文传输。务必用方式一或自行套 HTTPS。
-
-### 方式三：裸机 systemd + nginx
-
-```bash
-sudo useradd --system --home /var/lib/simhub-keeper --shell /usr/sbin/nologin simhub
-sudo mkdir -p /opt/simhub-keeper-web /var/lib/simhub-keeper
-sudo chown simhub:simhub /var/lib/simhub-keeper
-python3 -m venv /opt/simhub-keeper-web/.venv
-/opt/simhub-keeper-web/.venv/bin/pip install -r requirements.txt
-```
-
-环境文件 `/etc/simhub-keeper.env`：
+访问：
 
 ```text
+http://服务器IP:8080
+```
+
+公网部署不要裸跑 HTTP。
+
+## 环境变量
+
+核心变量：
+
+```env
 SECRET_KEY=change-this-to-a-long-random-string
-DATABASE=/var/lib/simhub-keeper/simhub.sqlite
+DATA_ENCRYPTION_KEY=change-this-to-another-long-random-string
+DATABASE=/data/simhub.sqlite
+TZ=Asia/Shanghai
+SIMHUB_DOMAIN=simhub.example.com
+REMINDER_SCAN_INTERVAL_SECONDS=3600
 ```
 
-复制 `systemd/simhub-keeper.service` 到 `/etc/systemd/system/`，然后：
+安全相关：
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now simhub-keeper
+```env
+SESSION_COOKIE_SECURE=1
+ENABLE_HSTS=1
+# 仅在可信反代覆盖 X-Forwarded-For 时开启
+# TRUST_PROXY=1
 ```
 
-再把 `nginx/simhub-keeper.conf` 按域名改好放进 nginx 配置目录（建议配合 certbot 上 HTTPS）。
+导入限制：
 
-## 备份
+```env
+MAX_CONTENT_LENGTH=8388608
+MAX_IMPORT_CARDS=1000
+```
 
-- **一键导出**：设置 → 数据备份 → 导出 JSON 备份（兼容 App 格式，可再导入）。
-- **整库备份**（Docker 卷）：
+邮件、Telegram、Webhook 通知主要在网页「设置」里配置，不需要直接写环境变量。
+
+## 数据与备份
+
+Docker 默认把数据库挂载到 `/data/simhub.sqlite`。生产环境请定期备份数据卷。
+
+一键导出：
+
+```text
+设置 -> 数据备份 -> 导出 JSON 备份
+```
+
+Docker 卷备份示例：
 
 ```bash
 docker run --rm -v simhub-data:/data -v "$PWD":/backup alpine \
   tar czf /backup/simhub-backup-$(date +%Y%m%d).tar.gz -C /data .
 ```
 
-## 界面预览
+导出的 JSON 可能包含号码、SM-DP+、激活码、确认码、EID 等敏感信息，请按密钥文件保存。
 
-> 截图可放在 `docs/screenshots/` 下：概览页、卡片管理（国旗背景）、卡片详情、编辑弹窗、设置页。
+## 提醒机制
 
-## App 数据兼容 / API
+Docker Compose 会同时启动：
 
-SQLite 内部表 `cards` 字段用 snake_case 保存；导入导出与 API 返回时转换成 App 的 camelCase `ESIMCardDTO`。
+- `simhub-keeper`：Web 后台
+- `simhub-reminders`：后台提醒 worker
+
+默认每小时扫描一次：
+
+```env
+REMINDER_SCAN_INTERVAL_SECONDS=3600
+```
+
+支持：
+
+- 到期提醒
+- 单卡操作提醒，例如续费、充值、实名、取消套餐
+- 邮件、Telegram、Webhook
+- 提醒历史、失败原因、立即扫描
+
+提醒去重按 `card_id + event_type + sent_date + channel` 记录。发送失败不会记为成功，同一天会继续重试。
+
+## 安全说明
+
+- 密码使用 `pbkdf2:sha256` 哈希保存
+- SMTP 授权码、Telegram Token、SM-DP+、激活码、确认码、EID 会加密后入库
+- 写操作 API 需要 `X-CSRF-Token`，并只接受 JSON 请求体
+- 默认登录限流，防止暴力破解
+- 支持邮箱或 Telegram 登录二次验证
+- 生产环境建议开启 `SESSION_COOKIE_SECURE=1` 和 `ENABLE_HSTS=1`
+- 不要把 `.env`、数据库、导出 JSON、备份包提交到 GitHub
+
+`DATA_ENCRYPTION_KEY` 必须长期固定。丢失后，已加密的通知配置和 eSIM 敏感字段无法解密，需要重新填写。
+
+## eSIM 解析器
+
+后台的「eSIM 工具」目前只保留通用解析器：
+
+- 手动输入 `LPA:1$smdp.example.com$MATCHINGID`
+- 从二维码图片识别 LPA
+- 使用摄像头扫描二维码
+- 生成二维码
+- 复制 iOS 安装链接
+- 带入新卡片表单
+
+解析在浏览器和本服务内完成，不会发送到第三方二维码解析服务。
+
+## API 概览
+
+登录后可访问 `/api/docs` 查看字段和端点说明。
+
+常用端点：
 
 ```text
+GET    /api/status
 GET    /api/cards
 POST   /api/cards
 GET    /api/cards/<id>
 PUT    /api/cards/<id>
 DELETE /api/cards/<id>
-POST   /api/cards/batch-update     # {"ids":[...],"action":"delete"|"addTags","tags":[...]}
+POST   /api/cards/batch-update
+
 GET    /api/export
-POST   /api/import                 # {"mode":"preview"|"commit","cards":[...]}
-GET    /api/countries              # 252 国（国旗、区号、卡片背景）
-GET    /api/appsearch?term=&country=US   # 代理 Apple iTunes 搜 App 图标
-GET    /api/smtp  /  POST /api/smtp  /  POST /api/smtp/test   # 邮件配置
-POST   /api/password               # 修改登录密码
+POST   /api/import
+POST   /api/lpa/parse
+
+GET    /api/countries
+GET    /api/appsearch?term=&country=US
+
+GET    /api/smtp
+POST   /api/smtp
+POST   /api/smtp/test
+
+GET    /api/reminders/status
+POST   /api/reminders/run
+
+POST   /api/username
+POST   /api/password
 ```
 
-## 贡献
+## 开发
 
-欢迎 Issue / PR。开发约定：
+本地运行：
 
-- 后端：单文件 Flask（`app/main.py`），保持轻量、无重型依赖。
-- 前端：`app/templates/spa.html` 单页，原生 JS + CSS 变量，无前端框架。
-- 提 PR 前请本地跑通：创建管理员 → 登录 → 增删改查卡片 → 导入导出。
-- Bug / 需求请走 GitHub Issues（建议附复现步骤、截图、部署方式）。
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+flask --app app.main run --debug
+```
+
+语法检查：
+
+```bash
+python3 -m compileall app
+```
+
+开发约定：
+
+- 后端保持轻量 Flask，不引入重型框架
+- 前端为 `app/templates/spa.html` 单页原生 JS
+- 数据结构兼容 App 的 JSON 导入导出
+- UI 以浅色玻璃拟态为主，优先可读性和管理效率
 
 ## 许可证
 
-[AGPL-3.0](LICENSE)。你可以自由使用、修改、自托管；但若你修改后**对外提供网络服务**，须同样以 AGPL 开源你的修改版本。
+[AGPL-3.0](LICENSE)。你可以自由使用、修改和自托管；如果修改后对外提供网络服务，需要同样以 AGPL 开源修改版本。

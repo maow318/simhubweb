@@ -1,6 +1,6 @@
 # 生产部署：Caddy 自动签发 Let's Encrypt 证书 + 强制 HTTPS。
 # 用法：
-#   cp .env.example .env   # 填好 SECRET_KEY 和 SIMHUB_DOMAIN
+#   cp .env.example .env   # 填好 SECRET_KEY、DATA_ENCRYPTION_KEY 和 SIMHUB_DOMAIN
 #   docker compose -f docker-compose.prod.yml up -d --build
 # 前提：SIMHUB_DOMAIN 的 DNS A 记录已指向本服务器，且 80/443 端口可达。
 services:
@@ -9,12 +9,38 @@ services:
     container_name: simhub-keeper
     environment:
       - SECRET_KEY=${SECRET_KEY:?请在 .env 设置 SECRET_KEY}
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:?请在 .env 设置 DATA_ENCRYPTION_KEY}
+      - SIMHUB_DOMAIN=${SIMHUB_DOMAIN:?请在 .env 设置 SIMHUB_DOMAIN}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-1}
+      - ENABLE_HSTS=${ENABLE_HSTS:-1}
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-8388608}
+      - MAX_IMPORT_CARDS=${MAX_IMPORT_CARDS:-1000}
       - TZ=${TZ:-Asia/Shanghai}
     volumes:
       - simhub-data:/data
     restart: unless-stopped
     expose:
       - "8080"
+
+  reminders:
+    build: .
+    container_name: simhub-reminders
+    command: python -m app.reminder_worker
+    environment:
+      - SECRET_KEY=${SECRET_KEY:?请在 .env 设置 SECRET_KEY}
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:?请在 .env 设置 DATA_ENCRYPTION_KEY}
+      - SIMHUB_DOMAIN=${SIMHUB_DOMAIN:?请在 .env 设置 SIMHUB_DOMAIN}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH:-8388608}
+      - MAX_IMPORT_CARDS=${MAX_IMPORT_CARDS:-1000}
+      - TZ=${TZ:-Asia/Shanghai}
+      - REMINDER_SCAN_INTERVAL_SECONDS=${REMINDER_SCAN_INTERVAL_SECONDS:-3600}
+    volumes:
+      - simhub-data:/data
+    restart: unless-stopped
+    depends_on:
+      - app
 
   caddy:
     image: caddy:2

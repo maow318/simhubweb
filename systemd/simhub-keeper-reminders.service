@@ -1,0 +1,17 @@
+[Unit]
+Description=SimHub Keeper due reminder scan
+After=network-online.target simhub-keeper.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/simhub-keeper-web
+EnvironmentFile=/etc/simhub-keeper.env
+ExecStart=/opt/simhub-keeper-web/.venv/bin/flask --app app.main send-reminders
+User=simhub
+Group=simhub
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/simhub-keeper

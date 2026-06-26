@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS cards (
     id TEXT PRIMARY KEY,
     carrier TEXT NOT NULL DEFAULT '',
     plan TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
     phone_number TEXT NOT NULL DEFAULT '',
     country_code TEXT NOT NULL DEFAULT '',
     country_name TEXT NOT NULL DEFAULT '',
@@ -39,6 +40,12 @@ CREATE TABLE IF NOT EXISTS cards (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     is_long_term INTEGER NOT NULL DEFAULT 0,
+    reminder_mode TEXT NOT NULL DEFAULT 'default',
+    reminder_days_before INTEGER,
+    operation_reminder_enabled INTEGER NOT NULL DEFAULT 0,
+    operation_date TEXT,
+    operation_days_before_expiry INTEGER,
+    operation_note TEXT,
     renew_days INTEGER NOT NULL DEFAULT 30,
     renewal_unit TEXT,
     renewal_interval_value INTEGER
@@ -73,14 +80,41 @@ CREATE TABLE IF NOT EXISTS settings (
     tg_token TEXT NOT NULL DEFAULT '',
     tg_chat_id TEXT NOT NULL DEFAULT '',
     tg_reminder_enabled INTEGER NOT NULL DEFAULT 0,
-    tg_days_before INTEGER NOT NULL DEFAULT 3
+    tg_days_before INTEGER NOT NULL DEFAULT 3,
+    webhook_enabled INTEGER NOT NULL DEFAULT 0,
+    webhook_url TEXT NOT NULL DEFAULT '',
+    webhook_method TEXT NOT NULL DEFAULT 'POST',
+    webhook_headers TEXT NOT NULL DEFAULT '',
+    webhook_payload TEXT NOT NULL DEFAULT '',
+    webhook_days_before INTEGER NOT NULL DEFAULT 3,
+    last_reminder_scan_at TEXT NOT NULL DEFAULT '',
+    last_reminder_scanned INTEGER NOT NULL DEFAULT 0,
+    last_reminder_matched INTEGER NOT NULL DEFAULT 0,
+    last_reminder_sent INTEGER NOT NULL DEFAULT 0,
+    last_reminder_failed INTEGER NOT NULL DEFAULT 0
 );
 
 INSERT OR IGNORE INTO settings (id) VALUES (1);
 
 CREATE TABLE IF NOT EXISTS reminder_log (
     card_id TEXT NOT NULL,
+    event_type TEXT NOT NULL DEFAULT 'expiry',
     sent_date TEXT NOT NULL,
     channel TEXT NOT NULL DEFAULT 'email',
-    PRIMARY KEY (card_id, sent_date, channel)
+    PRIMARY KEY (card_id, event_type, sent_date, channel)
 );
+
+CREATE TABLE IF NOT EXISTS reminder_attempt_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id TEXT,
+    card_label TEXT,
+    event_type TEXT NOT NULL DEFAULT 'expiry',
+    channel TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error TEXT,
+    sent_date TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminder_attempt_log_created ON reminder_attempt_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_reminder_attempt_log_card ON reminder_attempt_log(card_id);

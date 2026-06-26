@@ -5,142 +5,173 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SIMHUB Web 管理</title>
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0a84ff">
+<meta name="theme-color" content="#2f6df6">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SIMHUB">
-<style>
+<style nonce="__CSP_NONCE__">
 :root{
-  --bg:#f2f2f7; --card:#ffffff; --card2:#fbfbfd; --text:#1d1d1f; --sub:#86868b; --line:#e5e5ea;
-  --accent:#0a84ff; --accent-weak:rgba(10,132,255,.12); --danger:#ff3b30; --ok:#34c759; --warn:#ff9500;
-  --radius:18px; --radius-sm:12px;
-  --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);
-  --shadow-lg:0 1px 2px rgba(0,0,0,.04),0 12px 28px rgba(0,0,0,.08);
+  color-scheme:light;
+  --bg:#eef5fb; --card:rgba(255,255,255,.72); --card2:rgba(255,255,255,.5); --text:#111827; --sub:#526174; --muted:#7a8798; --line:rgba(127,146,172,.24);
+  --glass:rgba(255,255,255,.68); --glass-strong:rgba(255,255,255,.82); --glass-soft:rgba(255,255,255,.48);
+  --accent:#2f6df6; --accent2:#14b8a6; --accent3:#f97378; --accent-weak:rgba(47,109,246,.14); --danger:#dc2626; --ok:#16a34a; --warn:#d97706; --neutral:#64748b;
+  --radius:18px; --radius-sm:12px; --radius-xs:10px;
+  --shadow:0 14px 34px rgba(31,45,70,.1),inset 0 1px 0 rgba(255,255,255,.68);
+  --shadow-lg:0 18px 48px rgba(31,45,70,.14),inset 0 1px 0 rgba(255,255,255,.72);
   --ring:0 0 0 4px var(--accent-weak); --t:.18s cubic-bezier(.4,0,.2,1);
-  --sidebar:#ffffff;
+  --sidebar:rgba(255,255,255,.76);
 }
 .dark{
-  --bg:#000000; --card:#1c1c1e; --card2:#161618; --text:#f5f5f7; --sub:#98989d; --line:#2c2c2e;
-  --accent-weak:rgba(10,132,255,.22);
-  --shadow:0 1px 2px rgba(0,0,0,.5); --shadow-lg:0 12px 28px rgba(0,0,0,.6); --sidebar:#0e0e10;
+  color-scheme:dark;
+  --bg:#090d14; --card:rgba(19,25,36,.66); --card2:rgba(15,20,30,.5); --text:#f7f8fb; --sub:#b8c0ce; --muted:#8f9aaa; --line:rgba(255,255,255,.12);
+  --glass:rgba(19,25,36,.62); --glass-strong:rgba(25,32,46,.78); --glass-soft:rgba(255,255,255,.08);
+  --accent:#7aa2ff; --accent2:#2dd4bf; --accent3:#fb7185; --accent-weak:rgba(122,162,255,.22);
+  --shadow:0 16px 44px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.08);
+  --shadow-lg:0 22px 64px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.12); --sidebar:rgba(16,22,32,.72);
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);letter-spacing:-.011em;
+body{margin:0;min-height:100vh;background:
+  linear-gradient(135deg,rgba(255,255,255,.96),rgba(232,240,248,.9) 31%,rgba(240,248,246,.92) 64%,rgba(238,241,250,.96)),
+  linear-gradient(112deg,rgba(47,109,246,.16),rgba(47,109,246,0) 43%),
+  linear-gradient(306deg,rgba(20,184,166,.14),rgba(20,184,166,0) 48%),
+  var(--bg);background-attachment:fixed;color:var(--text);letter-spacing:0;
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+.dark{background:
+  linear-gradient(135deg,rgba(11,15,23,.98),rgba(18,24,36,.96) 35%,rgba(10,28,31,.94) 68%,rgba(16,18,28,.98)),
+  linear-gradient(112deg,rgba(122,162,255,.16),rgba(122,162,255,0) 43%),
+  linear-gradient(306deg,rgba(45,212,191,.12),rgba(45,212,191,0) 48%),
+  var(--bg)}
+body:before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background:
+  repeating-linear-gradient(90deg,rgba(255,255,255,.14) 0 1px,transparent 1px 78px),
+  repeating-linear-gradient(0deg,rgba(255,255,255,.12) 0 1px,transparent 1px 72px);
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.68),rgba(0,0,0,.18));opacity:.42}
+.dark:before{opacity:.18}
 .hidden{display:none!important}
-button{font:inherit;cursor:pointer;border:none;border-radius:12px;padding:9px 15px;background:var(--accent);color:#fff;font-weight:600;letter-spacing:-.01em;transition:filter var(--t),transform var(--t),box-shadow var(--t),background var(--t)}
+button{font:inherit;cursor:pointer;border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:9px 15px;background:linear-gradient(135deg,var(--accent),#45a7ff);color:#fff;font-weight:700;letter-spacing:0;box-shadow:0 10px 24px rgba(47,109,246,.22),inset 0 1px 0 rgba(255,255,255,.28);transition:filter var(--t),transform var(--t),box-shadow var(--t),background var(--t)}
 button:hover{filter:brightness(1.06)}
 button:active{transform:scale(.97)}
 button:focus-visible{outline:none;box-shadow:var(--ring)}
-button.sec{background:var(--card);color:var(--text);border:1px solid var(--line);filter:none}
-button.sec:hover{background:var(--line);filter:none}
-button.danger{background:var(--danger)}
+button.sec{background:var(--glass-soft);color:var(--text);border:1px solid var(--line);filter:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.48)}
+button.sec:hover{background:var(--glass-strong);filter:none}
+button.danger{background:linear-gradient(135deg,var(--danger),#fb7185)}
 button.ghost{background:transparent;color:var(--text)}
-button.ghost:hover{background:var(--line);filter:none}
+button.ghost:hover{background:var(--glass-soft);filter:none}
 button:disabled{opacity:.5;cursor:default;transform:none;filter:none}
-input,select,textarea{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--text);outline:none;transition:border-color var(--t),box-shadow var(--t)}
+input,select,textarea{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.48);color:var(--text);outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.5);backdrop-filter:blur(14px) saturate(140%);transition:border-color var(--t),box-shadow var(--t),background var(--t)}
+.dark input,.dark select,.dark textarea{background:rgba(12,17,26,.52);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
 input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:var(--ring)}
-.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:transparent;color:var(--sub);padding:0;transition:background var(--t),color var(--t)}
-.iconbtn:hover{background:var(--line);color:var(--text)}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:10px;background:transparent;color:var(--sub);padding:0;box-shadow:none;transition:background var(--t),color var(--t)}
+.iconbtn:hover{background:var(--glass-soft);color:var(--text)}
 svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
-.logo{width:38px;height:38px;border-radius:13px;background:linear-gradient(135deg,#0a84ff,#5ac8fa);display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:#fff;font-size:18px;font-weight:700;overflow:hidden}
+.logo{width:38px;height:38px;border-radius:13px;background:linear-gradient(135deg,#2f6df6,#14b8a6 56%,#f97378);display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:#fff;font-size:18px;font-weight:800;overflow:hidden;box-shadow:0 12px 26px rgba(47,109,246,.26),inset 0 1px 0 rgba(255,255,255,.5)}
 
 /* 框架 */
 #app{display:flex;min-height:100vh}
-#sidebar{width:220px;background:var(--sidebar);border-right:1px solid var(--line);padding:18px 12px;flex-shrink:0;position:sticky;top:0;height:100vh}
+#app,#drawerHost,#pickerHost,#confirmHost,#toastHost{position:relative;z-index:1}
+#sidebar{width:230px;background:var(--sidebar);border-right:1px solid var(--line);padding:18px 12px;flex-shrink:0;position:sticky;top:0;height:100vh;backdrop-filter:blur(24px) saturate(150%);box-shadow:inset -1px 0 0 rgba(255,255,255,.22)}
 .brandRow{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
 .brandRow .logo{width:32px;height:32px;border-radius:9px;font-size:17px;margin:0}
 .brandRow b{font-size:16px}
 .nav{display:flex;flex-direction:column;gap:4px}
-.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;color:var(--text);cursor:pointer;font-size:15px;font-weight:500;transition:background var(--t),color var(--t)}
-.nav a.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px var(--accent-weak)}
-.nav a:not(.active):hover{background:var(--line)}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:12px;color:var(--text);cursor:pointer;font-size:15px;font-weight:650;transition:background var(--t),color var(--t),box-shadow var(--t),transform var(--t)}
+.nav a.active{background:linear-gradient(135deg,rgba(47,109,246,.96),rgba(20,184,166,.88));color:#fff;box-shadow:0 14px 28px rgba(47,109,246,.22),inset 0 1px 0 rgba(255,255,255,.34)}
+.nav a:not(.active):hover{background:var(--glass-soft);transform:translateX(2px)}
+.navIcon{width:30px;height:30px;flex:0 0 30px;object-fit:contain;border-radius:9px;display:block;filter:drop-shadow(0 4px 10px rgba(47,109,246,.18))}
+.navGlyph{width:30px;height:30px;flex:0 0 30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--accent-weak);color:var(--accent)}
+.navGlyph svg{width:17px;height:17px}
 #content{flex:1;min-width:0;display:flex;flex-direction:column}
-header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--card) 86%,transparent);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:12px 22px}
-header h1{font-size:18px;margin:0;font-weight:600;letter-spacing:-.02em}
-header .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+header{position:sticky;top:14px;z-index:5;background:var(--glass-strong);backdrop-filter:saturate(180%) blur(24px);border:1px solid var(--line);border-radius:20px;display:flex;align-items:center;gap:12px;padding:12px 16px;margin:14px 22px 0;box-shadow:var(--shadow)}
+header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:0}
+header .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 5px rgba(22,163,74,.12)}
 header .spacer{flex:1}
 header .meta{font-size:12px;color:var(--sub)}
-main{padding:22px;max-width:1180px;width:100%}
+main{padding:22px;max-width:1200px;width:100%}
 
 .statgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
-.stat{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;border:1px solid var(--line);transition:transform var(--t),box-shadow var(--t)}
+.stat{background:var(--glass);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;border:1px solid var(--line);backdrop-filter:blur(22px) saturate(155%);transition:transform var(--t),box-shadow var(--t),background var(--t)}
 .stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
-.stat .n{font-size:30px;font-weight:700;letter-spacing:-.02em}
+.stat .n{font-size:30px;font-weight:800;letter-spacing:0}
 .stat .l{color:var(--sub);font-size:13px;margin-top:2px}
 .stat.warn .n{color:var(--warn)} .stat.danger .n{color:var(--danger)}
-.panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line);padding:18px;margin-top:18px}
-.panel h3{margin:0 0 14px;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.panel{background:var(--glass);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line);padding:18px;margin-top:18px;backdrop-filter:blur(22px) saturate(155%)}
+.panel h3{margin:0 0 14px;font-size:15px;font-weight:750;letter-spacing:0}
+.sectionHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}
+.sectionHead h3{margin:0}
+button.mini{padding:6px 11px;border-radius:10px;font-size:13px;box-shadow:none}
 .bar{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:13px}
-.bar .track{flex:1;height:8px;background:var(--line);border-radius:6px;overflow:hidden}
-.bar .fill{height:100%;background:var(--accent);border-radius:6px}
+.bar .track{flex:1;height:8px;background:rgba(255,255,255,.34);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px}
 .recent{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
 .recent:last-child{border:none}
 
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
 .toolbar input,.toolbar select{max-width:200px}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;border:1px solid var(--line);position:relative;cursor:pointer;transition:transform var(--t),box-shadow var(--t),border-color var(--t)}
+.card{background:var(--glass);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;border:1px solid var(--line);position:relative;overflow:hidden;cursor:pointer;min-height:148px;backdrop-filter:blur(22px) saturate(155%);transition:transform var(--t),box-shadow var(--t),border-color var(--t),background var(--t)}
 .card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
-.card.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.card.sel{border-color:rgba(47,109,246,.72);box-shadow:0 0 0 2px var(--accent) inset,var(--shadow)}
 .card.sel:hover{box-shadow:0 0 0 2px var(--accent) inset,var(--shadow-lg)}
 .card .flag{font-size:26px}
-.card h3{margin:6px 0 2px;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.card h3{margin:6px 0 2px;font-size:16px;font-weight:750;letter-spacing:0}
 .card .sub{color:var(--sub);font-size:13px}
 .card .row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:13px;color:var(--sub)}
 .phone{display:inline-flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
 .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
 .badge.exp{background:rgba(255,59,48,.15);color:var(--danger)}
 .badge.soon{background:rgba(255,149,0,.15);color:var(--warn)}
-.selcheck{position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center}
+.categoryChip{display:inline-flex;align-items:center;width:max-content;max-width:100%;height:24px;padding:0 9px;border-radius:999px;background:rgba(47,109,246,.1);border:1px solid rgba(47,109,246,.16);color:var(--accent);font-size:12px;font-weight:760;white-space:nowrap}
+.selcheck{position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.3);backdrop-filter:blur(10px)}
 .card.sel .selcheck{background:var(--accent);border-color:var(--accent);color:#fff}
 
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:flex-end;z-index:20}
-.drawer{width:min(460px,100%);height:100%;background:var(--bg);overflow:auto;padding:20px;animation:slide .25s ease}
+.scrim{position:fixed;inset:0;background:rgba(12,18,28,.36);backdrop-filter:blur(10px);display:flex;justify-content:flex-end;z-index:20}
+.drawer{width:min(470px,100%);height:100%;background:var(--glass-strong);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);backdrop-filter:blur(26px) saturate(160%);overflow:auto;padding:20px;animation:slide .25s ease}
 @keyframes slide{from{transform:translateX(30px);opacity:.6}to{transform:none;opacity:1}}
 .field{margin-bottom:13px}
 .field label{display:block;font-size:13px;color:var(--sub);margin-bottom:5px}
 .drawerActions{display:flex;gap:10px;margin-top:6px}
-.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);padding:11px 18px;border-radius:24px;font-size:14px;z-index:30;animation:toastUp .25s cubic-bezier(.4,0,.2,1)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--glass-strong);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(18px) saturate(150%);padding:11px 18px;border-radius:24px;font-size:14px;z-index:30;animation:toastUp .25s cubic-bezier(.4,0,.2,1)}
 @keyframes toastUp{from{transform:translate(-50%,12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
-.drop{border:2px dashed var(--line);border-radius:var(--radius);padding:34px;text-align:center;color:var(--sub)}
+.drop{border:2px dashed var(--line);border-radius:var(--radius);padding:34px;text-align:center;color:var(--sub);background:var(--glass-soft)}
 .drop.over{border-color:var(--accent);color:var(--accent)}
 #menuBtn{display:none}
 @media(max-width:760px){
-  #sidebar{position:fixed;left:0;top:0;z-index:40;transform:translateX(-100%);transition:.25s;box-shadow:var(--shadow)}
+  #sidebar{position:fixed;left:0;top:0;z-index:40;transform:translateX(-100%);transition:.25s;box-shadow:var(--shadow-lg)}
   #sidebar.open{transform:none}
   #menuBtn{display:inline-flex}
-  header{backdrop-filter:none;background:var(--card)}  /* 手机端关掉毛玻璃,避免 Safari 卡顿 */
+  header{top:8px;margin:8px 12px 0;padding:10px 12px;border-radius:16px}
+  header .meta{display:none}
+  main{padding:14px 12px 20px}
   .scrim{justify-content:stretch}
   .drawer{width:100%;-webkit-overflow-scrolling:touch}
 }
 .secLabel{font-size:13px;font-weight:700;color:var(--sub);margin:18px 0 8px;text-transform:none}
 .two{display:flex;gap:10px}
-.pickRow{width:100%;display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
+.pickRow{width:100%;display:flex;align-items:center;gap:10px;background:var(--glass-soft);border:1px solid var(--line);
   color:var(--text);border-radius:11px;padding:11px 13px;font-weight:500;cursor:pointer;text-align:left;transition:border-color var(--t),background var(--t)}
-.pickRow:hover{border-color:var(--accent)}
+.pickRow:hover{border-color:var(--accent);background:var(--glass)}
 .pickRow .ph{color:var(--sub)}
 .pickRow .chev{margin-left:auto;color:var(--sub);font-size:20px}
-.appicon{width:34px;height:34px;border-radius:8px;object-fit:cover;background:var(--line)}
+.appicon{width:34px;height:34px;border-radius:10px;object-fit:cover;background:var(--glass-soft);border:1px solid var(--line)}
 .durs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.dur{background:var(--card);border:1px solid var(--line);color:var(--text);font-weight:600;padding:9px;transition:background var(--t),color var(--t),border-color var(--t)}
+.dur{background:var(--glass-soft);border:1px solid var(--line);color:var(--text);font-weight:650;padding:9px;transition:background var(--t),color var(--t),border-color var(--t)}
 .dur:hover{border-color:var(--accent);color:var(--accent)}
 .dur:active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .ltrow{display:flex;align-items:center;justify-content:space-between}
 .ltrow input{width:auto}
 .summary{font-size:13px;color:var(--sub);text-align:center;margin:6px 0 4px}
 .picker{justify-content:center;align-items:center;z-index:50}
-.pickerBox{background:var(--bg);width:min(440px,94vw);max-height:80vh;border-radius:18px;display:flex;flex-direction:column;overflow:hidden;padding:16px}
+.pickerBox{background:var(--glass-strong);width:min(440px,94vw);max-height:80vh;border:1px solid var(--line);box-shadow:var(--shadow-lg);backdrop-filter:blur(24px) saturate(155%);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;padding:16px}
 .pickerHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .pickerHead b{font-size:17px}
 .pickerList{overflow:auto;margin-top:10px;-webkit-overflow-scrolling:touch}
 .pkItem{display:flex;align-items:center;gap:12px;padding:11px 8px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:8px;transition:background var(--t)}
-.pkItem:hover{background:var(--line)}
+.pkItem:hover{background:var(--glass-soft)}
 .pkItem .sub{font-size:12px;color:var(--sub)}
 .confirm{justify-content:center;align-items:center;z-index:60}
-.confirmBox{background:var(--card);width:min(340px,90vw);border-radius:20px;padding:24px 22px;text-align:center;box-shadow:var(--shadow)}
+.confirmBox{background:var(--glass-strong);width:min(340px,90vw);border:1px solid var(--line);border-radius:20px;padding:24px 22px;text-align:center;box-shadow:var(--shadow-lg);backdrop-filter:blur(24px) saturate(155%)}
 .confirmBox .ic{width:54px;height:54px;border-radius:50%;background:rgba(255,59,48,.14);color:var(--danger);
   display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:24px}
 .confirmBox h3{margin:0 0 6px;font-size:18px}
@@ -149,46 +180,118 @@ main{padding:22px;max-width:1180px;width:100%}
 .confirmActions button{flex:1;padding:12px}
 .logo{overflow:hidden}
 .logo img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
-.setlist{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-top:14px}
+.setlist{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(155%);overflow:hidden;margin-top:14px}
 .setRow{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer;transition:background var(--t)}
 .setRow:last-child{border-bottom:none}
-.setRow:hover{background:var(--line)}
+.setRow:hover{background:var(--glass-soft)}
 .setRow .rt{flex:1;min-width:0}
-.setRow .rt b{font-size:15px;font-weight:500;letter-spacing:-.01em}
+.setRow .rt b{font-size:15px;font-weight:650;letter-spacing:0}
 .setRow .rt span{display:block;font-size:12px;color:var(--sub);margin-top:2px}
 .setRow .chev{color:var(--sub);font-size:20px;line-height:1}
 .setRow.danger .rt b{color:var(--danger)}
 .setRow input[type=checkbox]{width:auto}
+.apiBlock{border-top:1px solid var(--line);padding:16px 0}
+.apiBlock:first-child{border-top:none;padding-top:0}
+.apiBlock h3{margin:0 0 10px}
+.apiRow{display:grid;grid-template-columns:92px minmax(180px,.75fr) minmax(0,1fr);gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.apiRow:last-child{border-bottom:none}
+.apiRow code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);background:rgba(255,255,255,.38);border:1px solid var(--line);border-radius:8px;padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.apiMethod{font-weight:850;color:var(--accent);font-size:12px}
 .subhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.subhead h2{font-size:20px;margin:0;font-weight:600;letter-spacing:-.02em}
+.subhead h2{font-size:20px;margin:0;font-weight:750;letter-spacing:0}
 .subhead .iconbtn{width:34px;height:34px}
+.securityGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;max-width:1120px;margin-top:20px}
+.securityCard{display:flex;flex-direction:column;background:rgba(255,255,255,.56);border:1px solid rgba(255,255,255,.62);border-radius:24px;box-shadow:0 16px 44px rgba(31,45,70,.1),inset 0 1px 0 rgba(255,255,255,.72);backdrop-filter:blur(24px) saturate(150%);padding:32px;min-width:0}
+.securityCard h3{margin:0;font-size:20px;font-weight:780;letter-spacing:0;color:var(--text)}
+.securityCard .sub{margin:8px 0 28px;font-size:14px;line-height:1.55;color:var(--sub)}
+.securityFields{display:grid;gap:20px}
+.securityFields .field{margin:0}
+.securityFields .field label{font-size:13px;font-weight:700;color:#6b7588;margin-bottom:8px}
+.securityFields input{height:56px;border-radius:14px;padding:0 16px;background:rgba(255,255,255,.68);border-color:rgba(255,255,255,.74);box-shadow:inset 0 1px 0 rgba(255,255,255,.62)}
+.securityFields input[readonly]{color:#667085;background:rgba(255,255,255,.42)}
+.securityActions{display:flex;justify-content:flex-end;margin-top:32px}
+.securityActions button{min-width:136px;height:46px;border-radius:14px;box-shadow:0 10px 24px rgba(47,109,246,.18),inset 0 1px 0 rgba(255,255,255,.28)}
+.dark .securityCard{background:rgba(25,32,46,.64);border-color:rgba(255,255,255,.13);box-shadow:0 18px 54px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.08)}
+.dark .securityFields input{background:rgba(12,17,26,.5);border-color:rgba(255,255,255,.12)}
+.dark .securityFields input[readonly]{background:rgba(255,255,255,.06);color:#a6afbf}
+@media(max-width:920px){.securityGrid{grid-template-columns:1fr;max-width:none}.securityCard{padding:24px}.securityActions button{width:100%}}
+@media(max-width:760px){.apiRow{grid-template-columns:1fr}.apiRow code{white-space:normal;word-break:break-all}.splitGrid{grid-template-columns:1fr}}
 .card.hasbg h3{color:var(--text)}
 .card.hasbg .sub,.card.hasbg .row{color:var(--sub)}
-.card-bg{position:absolute;inset:0;background-size:cover;background-position:center right;z-index:0}
-.card-shade{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,.78) 38%,rgba(255,255,255,.22) 68%,rgba(255,255,255,0) 100%)}
-.dark .card-shade{background:linear-gradient(90deg,rgba(18,18,20,.95) 0%,rgba(18,18,20,.78) 38%,rgba(18,18,20,.24) 68%,rgba(18,18,20,0) 100%)}
+.card-bg{position:absolute;inset:0;background-size:cover;background-position:center right;z-index:0;border-radius:inherit;pointer-events:none}
+.card-shade{position:absolute;inset:0;z-index:1;border-radius:inherit;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,.92) 0%,rgba(255,255,255,.72) 40%,rgba(255,255,255,.28) 68%,rgba(255,255,255,.08) 100%);backdrop-filter:blur(1px)}
+.dark .card-shade{background:linear-gradient(90deg,rgba(15,20,30,.9) 0%,rgba(15,20,30,.68) 40%,rgba(15,20,30,.28) 68%,rgba(15,20,30,.06) 100%)}
 .card-content{position:relative;z-index:2}
 .card.hasbg .selcheck{z-index:3}
-.card-bg{background-color:var(--line)}
+.card-bg{background-color:var(--glass-soft)}
 .moreBtn{position:absolute;top:8px;right:8px;font-size:20px;line-height:1;z-index:3}
 .card:not(.hasbg) .moreBtn{color:var(--sub)}
-.card.hasbg .moreBtn{color:#fff;background:rgba(0,0,0,.3)}
-.card.hasbg .moreBtn:hover{background:rgba(0,0,0,.45)}
+.card.hasbg .moreBtn{color:#fff;background:rgba(15,20,30,.32);backdrop-filter:blur(10px)}
+.card.hasbg .moreBtn:hover{background:rgba(15,20,30,.48)}
 .detailHead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.detailHead h2{font-size:20px;letter-spacing:-.02em}
+.detailHead h2{font-size:20px;letter-spacing:0}
 .dRow{display:flex;justify-content:space-between;gap:16px;padding:11px 2px;border-bottom:1px solid var(--line);font-size:14px}
 .dRow .dL{color:var(--sub);flex-shrink:0}
 .dRow .dV{text-align:right;word-break:break-all}
-.codeblk{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12px;overflow:auto;white-space:pre;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.codeblk{background:rgba(255,255,255,.34);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12px;overflow:auto;white-space:pre;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;backdrop-filter:blur(14px)}
+.dark .codeblk{background:rgba(0,0,0,.18)}
 code{background:var(--card2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px;font-family:ui-monospace,Menlo,monospace}
 .grid:not(.selecting) .selcheck{display:none}
 .grid.selecting .moreBtn{display:none}
 .batchActions{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
 .scrim.center{justify-content:center;align-items:center}
-.modalBox{background:var(--bg);width:min(560px,94vw);max-height:88vh;overflow:auto;border-radius:18px;padding:22px;animation:pop .2s ease}
+.modalBox{background:var(--glass-strong);border:1px solid var(--line);box-shadow:var(--shadow-lg);backdrop-filter:blur(24px) saturate(155%);width:min(560px,94vw);max-height:88vh;overflow:auto;border-radius:18px;padding:22px;animation:pop .2s ease}
 @keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}
+.dateInput{height:52px;border-radius:14px;cursor:pointer;caret-color:transparent;background:rgba(255,255,255,.62)}
+.datePickerHost{position:fixed;z-index:90;pointer-events:none}
+.glassCal{width:360px;border-radius:24px;padding:18px;background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.7);box-shadow:0 24px 70px rgba(31,45,70,.2),inset 0 1px 0 rgba(255,255,255,.72);backdrop-filter:blur(28px) saturate(170%);pointer-events:auto;color:var(--text)}
+.glassCalHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.glassCalTitle{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;margin-left:-10px;border-radius:14px;background:transparent;border:none;color:var(--text);font-size:20px;font-weight:800;letter-spacing:0;box-shadow:none}
+.glassCalTitle:after{content:"⌄";font-size:18px;color:var(--accent);line-height:1}
+.glassCalTitle.wheel:after{content:"⌃"}
+.glassCalNav{display:flex;gap:8px}
+.glassCal button{box-shadow:none}
+.glassCalNav button,.glassCalFoot button{background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.58);color:var(--text);filter:none}
+.glassCalNav button{width:38px;height:38px;padding:0;border-radius:14px;font-size:18px}
+.glassCalNav button[data-date-action="wheel-done"]{width:auto;min-width:64px;padding:0 14px;font-size:15px;font-weight:750}
+.glassCalWeek,.glassCalGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
+.glassCalWeek span{text-align:center;color:var(--sub);font-size:13px;font-weight:750;padding:4px 0}
+.glassCalDay{height:42px;padding:0;border-radius:14px;background:rgba(255,255,255,.3);border:1px solid transparent;color:var(--text);font-size:15px;font-weight:700}
+.glassCalDay.out{color:rgba(102,112,133,.46)}
+.glassCalDay.today{border-color:rgba(47,109,246,.36)}
+.glassCalDay.sel{background:linear-gradient(135deg,var(--accent),#45a7ff);color:#fff;box-shadow:0 12px 24px rgba(47,109,246,.22)}
+.glassCalDay:hover,.glassCalNav button:hover,.glassCalFoot button:hover{filter:none;background:rgba(255,255,255,.62)}
+.glassCalDay.sel:hover{background:linear-gradient(135deg,var(--accent),#45a7ff)}
+.glassCalFoot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.glassCalFoot button{height:40px;border-radius:13px;padding:0 14px}
+.glassCalWheel{position:relative;display:grid;grid-template-columns:1.08fr .92fr;gap:10px;height:248px;margin-top:6px;padding:18px 8px;overflow:hidden;border-radius:22px;background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,.14));border:1px solid rgba(255,255,255,.48)}
+.glassCalWheel:before,.glassCalWheel:after{content:"";position:absolute;left:0;right:0;z-index:2;pointer-events:none}
+.glassCalWheel:before{top:0;height:72px;background:linear-gradient(to bottom,rgba(250,252,255,.92),rgba(250,252,255,0))}
+.glassCalWheel:after{bottom:0;height:72px;background:linear-gradient(to top,rgba(250,252,255,.92),rgba(250,252,255,0))}
+.glassCalWheelMark{position:absolute;left:18px;right:18px;top:50%;height:48px;transform:translateY(-50%);border-radius:16px;background:linear-gradient(135deg,rgba(47,109,246,.1),rgba(20,184,166,.08));border:1px solid rgba(255,255,255,.72);box-shadow:inset 0 1px 0 rgba(255,255,255,.62),0 10px 28px rgba(47,109,246,.08);pointer-events:none}
+.wheelCol{position:relative;z-index:3;height:210px;overflow-y:auto;scroll-snap-type:y mandatory;padding:81px 0;scrollbar-width:none;mask-image:linear-gradient(to bottom,transparent,black 18%,black 82%,transparent)}
+.wheelCol::-webkit-scrollbar{display:none}
+.wheelItem{height:48px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:rgba(102,112,133,.52);font-size:21px;font-weight:650;scroll-snap-align:center;border-radius:14px;box-shadow:none;transition:color var(--t),font-size var(--t),background var(--t)}
+.wheelCol[data-wheel-type="year"] .wheelItem{justify-content:flex-end;padding-right:18px}
+.wheelCol[data-wheel-type="month"] .wheelItem{justify-content:flex-start;padding-left:18px}
+.wheelItem.sel{color:var(--text);font-size:25px;font-weight:800}
+.wheelItem:hover{filter:none;background:rgba(255,255,255,.34)}
+.glassCal.wheelMode{padding:18px 18px 16px}
+.glassCal.wheelMode .glassCalHead{margin-bottom:8px}
+.glassCal.wheelMode .glassCalFoot{margin-top:12px}
+.dark .dateInput{background:rgba(12,17,26,.52)}
+.dark .glassCal{background:rgba(25,32,46,.76);border-color:rgba(255,255,255,.14);box-shadow:0 26px 76px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.1)}
+.dark .glassCalNav button,.dark .glassCalFoot button,.dark .glassCalDay{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.1)}
+.dark .glassCalDay.out{color:rgba(166,175,191,.42)}
+.dark .glassCalWheel{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04));border-color:rgba(255,255,255,.1)}
+.dark .glassCalWheel:before{background:linear-gradient(to bottom,rgba(25,32,46,.94),rgba(25,32,46,0))}
+.dark .glassCalWheel:after{background:linear-gradient(to top,rgba(25,32,46,.94),rgba(25,32,46,0))}
+.dark .glassCalWheelMark{background:linear-gradient(135deg,rgba(122,162,255,.16),rgba(45,212,191,.1));border-color:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 12px 30px rgba(0,0,0,.18)}
+.dark .wheelItem{color:rgba(166,175,191,.5)}
+.dark .wheelItem.sel{color:var(--text)}
+@media(max-width:520px){.glassCal{width:calc(100vw - 24px)}}
 .tagcloud{display:flex;flex-wrap:wrap;gap:8px}
-.tagcloud .tc{background:var(--accent-weak);color:var(--accent);border-radius:20px;padding:3px 11px;font-weight:600;line-height:1.6}
+.tagcloud .tc{background:var(--accent-weak);color:var(--accent);border-radius:20px;padding:3px 11px;font-weight:700;line-height:1.6}
 .acts{display:flex;flex-direction:column}
 .act{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
 .act:last-child{border:none}
@@ -199,12 +302,201 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:5px;padd
 .act .ai.import{background:rgba(255,149,0,.16);color:var(--warn)}
 .act .at{flex:1;min-width:0}
 .act .as{color:var(--sub);font-size:12px}
-.advfilter{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:16px}
+.advfilter{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(155%);padding:14px;margin-bottom:16px}
 .advfilter .row2{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:12px}
-.chip{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;font-size:13px;transition:all var(--t)}
-.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip{background:var(--glass-soft);border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;font-size:13px;transition:all var(--t)}
+.chip.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;box-shadow:0 10px 24px rgba(47,109,246,.18)}
 
 
+
+/* SaaS 控制台打磨层 */
+button.primary{background:linear-gradient(135deg,var(--accent),#45a7ff);color:#fff}
+button.subtle{background:rgba(255,255,255,.38);color:var(--sub);border-color:var(--line);box-shadow:none}
+button.subtle:hover{background:rgba(255,255,255,.62);color:var(--text);filter:none}
+button.logout{height:34px;padding:0 12px;border-radius:12px;background:transparent;color:var(--sub);border-color:var(--line);box-shadow:none}
+button.logout:hover{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.22);color:var(--danger);filter:none}
+input::placeholder,textarea::placeholder{color:#8792a3}
+.dark input::placeholder,.dark textarea::placeholder{color:#828c9c}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px}
+header{min-height:62px}
+.titleStack{display:flex;align-items:center;gap:10px;min-width:0}
+.titleStack h1{white-space:nowrap}
+.statePill,.keeperBadge,.statusBadge,.miniPill{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border-radius:999px;font-weight:750}
+.statePill{height:24px;padding:0 9px;background:rgba(22,163,74,.1);color:#15803d;border:1px solid rgba(22,163,74,.18);font-size:12px}
+.statePill:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(22,163,74,.12)}
+.keeperBadge{height:32px;padding:0 11px;background:rgba(255,255,255,.48);border:1px solid var(--line);color:var(--text);font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.54)}
+.dark .keeperBadge{background:rgba(255,255,255,.08)}
+.iconbtn{border:1px solid transparent}
+.iconbtn:hover{border-color:var(--line)}
+.nav a{min-height:44px}
+.nav a:not(.active){color:#243044}
+.dark .nav a:not(.active){color:var(--text)}
+.nav a:not(.active) .navIcon{opacity:.74;filter:none}
+.nav a.active .navIcon{filter:drop-shadow(0 7px 14px rgba(0,0,0,.16));opacity:1}
+.nav a.active .navGlyph{background:rgba(255,255,255,.18);color:#fff}
+.brandRow{gap:11px;padding:8px 9px 18px}
+.brandRow b{letter-spacing:.08em}
+.panel,.stat,.card,.setlist,.securityCard,.advfilter{border-color:var(--line);box-shadow:var(--shadow)}
+.panel h3,.sectionHead h3{color:var(--text);font-size:16px}
+.sub{color:var(--sub)}
+.statusBadge{height:26px;padding:0 11px;font-size:12px;border:1px solid transparent;font-weight:850;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
+.statusBadge.ok{background:rgba(22,163,74,.2);color:#047857;border-color:rgba(22,163,74,.36)}
+.statusBadge.warn{background:rgba(245,158,11,.24);color:#b45309;border-color:rgba(217,119,6,.42)}
+.statusBadge.danger{background:rgba(220,38,38,.18);color:#b91c1c;border-color:rgba(220,38,38,.36)}
+.statusBadge.neutral{background:rgba(100,116,139,.18);color:#334155;border-color:rgba(100,116,139,.32)}
+.dark .statusBadge.ok{color:#86efac}.dark .statusBadge.warn{color:#facc15}.dark .statusBadge.danger{color:#fca5a5}.dark .statusBadge.neutral{color:#cbd5e1}
+.miniPill{height:22px;padding:0 8px;font-size:11px;border:1px solid var(--line);background:rgba(255,255,255,.44);color:var(--sub)}
+.statgrid{grid-template-columns:repeat(4,minmax(170px,1fr))}
+.stat{display:grid;gap:12px;min-height:142px;padding:18px}
+.statTop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.statIcon{width:36px;height:36px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--accent-weak);color:var(--accent)}
+.statIcon svg{width:19px;height:19px}
+.stat .n{font-size:34px;line-height:1;color:var(--text)}
+.stat.primary .n{font-size:42px}
+.stat .l{font-size:14px;color:var(--text);font-weight:750}
+.stat .hint{font-size:12px;color:var(--sub);line-height:1.35}
+.stat.warn .statIcon{background:rgba(217,119,6,.12);color:var(--warn)}
+.stat.danger .statIcon{background:rgba(220,38,38,.1);color:var(--danger)}
+.stat.ok .statIcon{background:rgba(22,163,74,.11);color:var(--ok)}
+.overviewGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.72fr);gap:18px;align-items:start}
+.distList{display:grid;gap:12px}
+.distRow{display:grid;grid-template-columns:minmax(110px,1fr) auto;gap:10px;align-items:center}
+.distMeta{display:flex;align-items:center;gap:8px;min-width:0}
+.distName{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.distCount{font-variant-numeric:tabular-nums;color:var(--text);font-weight:800}
+.distTrack{grid-column:1 / -1;height:9px;border-radius:999px;background:rgba(148,163,184,.18);overflow:hidden;border:1px solid rgba(127,146,172,.18)}
+.distFill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.splitGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.metricBox{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.34);padding:13px}
+.metricBox b{display:block;font-size:20px;color:var(--text);line-height:1.1}
+.metricBox span{display:block;color:var(--sub);font-size:12px;margin-top:5px}
+.costList,.riskList,.timelineList{display:grid;gap:10px}
+.costRow,.riskRow,.timelineRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:9px 0}
+.costRow:last-child,.riskRow:last-child,.timelineRow:last-child{border-bottom:none}
+.rowTitle{font-weight:800;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rowMeta{font-size:12px;color:var(--sub);margin-top:2px}
+.rowValue{font-weight:850;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.riskDot{width:10px;height:10px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 4px rgba(245,158,11,.12);flex:0 0 auto}
+.riskDot.danger{background:var(--danger);box-shadow:0 0 0 4px rgba(220,38,38,.1)}
+.riskMain{display:flex;align-items:center;gap:9px;min-width:0}
+.timelineDate{font-weight:850;color:var(--accent);white-space:nowrap}
+.recentList,.tableLike{display:grid}
+.recentItem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.recentItem:last-child{border-bottom:none}
+.recentMain{display:flex;gap:10px;align-items:center;min-width:0}
+.recentFlag{width:34px;height:34px;border-radius:12px;background:var(--glass-soft);display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:20px;border:1px solid var(--line)}
+.recentTitle{font-weight:780;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recentMeta{font-size:12px;color:var(--sub);margin-top:2px}
+.emptyState{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:38px 16px;color:var(--sub);gap:10px}
+.emptyIcon{width:48px;height:48px;border-radius:17px;background:var(--accent-weak);color:var(--accent);display:flex;align-items:center;justify-content:center}
+.emptyState b{color:var(--text);font-size:16px}
+.emptyState p{margin:0;max-width:360px;line-height:1.55}
+.toolbar{align-items:stretch;background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(155%);padding:12px}
+.toolbar input,.toolbar select{height:42px;max-width:none}
+.toolbar .searchInput{min-width:260px;flex:1 1 280px}
+.toolbar select{flex:0 1 170px}
+.toolbarActions{display:flex;gap:10px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.viewToggle{display:inline-flex;align-items:center;background:rgba(255,255,255,.44);border:1px solid var(--line);border-radius:13px;padding:3px;gap:2px}
+.viewToggle button{height:32px;padding:0 10px;border-radius:10px;background:transparent;color:var(--sub);border:0;box-shadow:none;font-size:13px}
+.viewToggle button.on{background:#fff;color:var(--text);box-shadow:0 5px 14px rgba(31,45,70,.08)}
+.dark .viewToggle button.on{background:rgba(255,255,255,.12)}
+.batchBar{display:flex;align-items:center;gap:10px;background:rgba(47,109,246,.08);border:1px solid rgba(47,109,246,.16);border-radius:14px;padding:8px 10px;margin-bottom:14px;color:var(--text)}
+.toolsGrid{display:grid;grid-template-columns:minmax(0,.92fr) minmax(320px,.58fr);gap:18px;align-items:start}
+.toolPanel{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(155%);padding:18px}
+.toolPanel h3{margin:0 0 6px;font-size:16px}
+.toolPanel .sub{font-size:13px;line-height:1.55}
+.toolPanelHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+.toolPanelHeader .sub{margin:0}
+.seg{display:inline-flex;gap:3px;padding:4px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.42);margin:14px 0}
+.seg button{height:34px;border:0;box-shadow:none;background:transparent;color:var(--sub);padding:0 13px;border-radius:10px}
+.seg button.on{background:#fff;color:var(--text);box-shadow:0 6px 14px rgba(31,45,70,.08)}
+.toolDrop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:210px;border:1.6px dashed rgba(47,109,246,.28);border-radius:18px;background:rgba(47,109,246,.06);text-align:center;padding:20px;color:var(--sub)}
+.toolDrop.over{border-color:var(--accent);background:rgba(47,109,246,.1)}
+.toolDrop svg{width:42px;height:42px;color:var(--accent)}
+.cameraBox{display:grid;gap:12px}
+.cameraBox video{width:100%;max-height:360px;object-fit:cover;border-radius:18px;background:#050816;border:1px solid var(--line)}
+.lpaOutput{display:grid;gap:12px}
+.qrBox{display:flex;align-items:center;justify-content:center;min-height:278px;border-radius:18px;background:#fff;border:1px solid var(--line);padding:16px;overflow:auto}
+.qrBox svg{width:min(260px,100%);height:auto;stroke:none}
+.lpaText{word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;background:rgba(255,255,255,.42);border:1px solid var(--line);border-radius:14px;padding:12px}
+.toolActions{display:flex;gap:10px;flex-wrap:wrap}
+.dark .seg button.on{background:rgba(255,255,255,.13)}
+.dark .qrBox{background:#f8fafc}
+.dark .previewStat,.dark .fieldChip,.dark .previewBox{background:rgba(255,255,255,.08)}
+.grid{gap:24px;grid-template-columns:repeat(auto-fill,minmax(420px,520px));justify-content:start;align-items:start}
+.card{width:100%;aspect-ratio:3/1;min-height:0;padding:14px;isolation:isolate}
+.card:hover{z-index:2}
+.card.hasbg:after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.04))}
+.card.hasbg .card-shade{background:linear-gradient(90deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,.83) 43%,rgba(255,255,255,.44) 72%,rgba(255,255,255,.12) 100%);backdrop-filter:blur(.6px)}
+.dark .card.hasbg .card-shade{background:linear-gradient(90deg,rgba(15,20,30,.92) 0%,rgba(15,20,30,.76) 43%,rgba(15,20,30,.42) 72%,rgba(15,20,30,.12) 100%)}
+.card.hasbg .statusBadge{background:rgba(255,255,255,.78);backdrop-filter:blur(12px) saturate(150%);box-shadow:0 8px 18px rgba(31,45,70,.12),inset 0 1px 0 rgba(255,255,255,.7)}
+.card.hasbg .statusBadge.ok{color:#047857;border-color:rgba(22,163,74,.48)}
+.card.hasbg .statusBadge.warn{color:#b45309;border-color:rgba(217,119,6,.5)}
+.card.hasbg .statusBadge.danger{color:#b91c1c;border-color:rgba(220,38,38,.48)}
+.card-content{height:100%;display:flex;flex-direction:column}
+.card .moreBtn{display:none}
+.grid.selecting .cardHead .statusBadge{margin-right:30px}
+.cardHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cardIdentity{display:flex;gap:10px;align-items:center;min-width:0}
+.cardIdentity .flag,.cardIdentity .appicon{width:36px;height:36px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.44);border:1px solid var(--line);font-size:22px}
+.cardTitle{font-size:17px;font-weight:800;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cardCountry{font-size:12px;color:var(--sub);margin-top:2px}
+.cardInfoGrid{display:grid;grid-template-columns:1fr auto;gap:8px 12px;margin-top:12px;align-items:end}
+.infoCell{background:rgba(255,255,255,.34);border:1px solid rgba(127,146,172,.16);border-radius:12px;padding:7px 9px;min-width:0}
+.infoCell span{display:block;color:var(--sub);font-size:11px;font-weight:700;margin-bottom:4px}
+.infoCell b{font-size:13px;color:var(--text);font-weight:760;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.cardMetaLine{display:flex;align-items:center;gap:10px;margin-top:8px;color:var(--sub);font-size:12px;min-width:0}
+.cardMetaLine span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cardMetaMain{display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden}
+.cardMetaMain>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cardMetaLine .phone{margin-left:auto;color:var(--text);font-weight:700;flex-shrink:0}
+.cardFoot{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:auto;color:var(--sub);font-size:12px}
+.cardDue{display:flex;gap:12px;min-width:0}
+.cardDue div{min-width:0}
+.cardDue span{display:block;font-size:10px;font-weight:800;color:var(--sub);margin-bottom:3px}
+.cardDue b{display:block;font-size:12px;color:var(--text);font-weight:800;white-space:nowrap}
+.quickActions{display:flex;gap:6px;opacity:0;transform:translateY(3px);transition:opacity var(--t),transform var(--t)}
+.card:hover .quickActions{opacity:1;transform:none}
+.quickActions .iconbtn{width:26px;height:26px;background:rgba(255,255,255,.5);border-color:var(--line)}
+.cardList{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;backdrop-filter:blur(22px) saturate(155%)}
+.cardList table{width:100%;border-collapse:collapse;font-size:13px}
+.cardList th{height:44px;text-align:left;color:var(--sub);font-size:12px;font-weight:800;background:rgba(255,255,255,.42);border-bottom:1px solid var(--line);padding:0 12px;white-space:nowrap}
+.cardList td{padding:12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.cardList tr:last-child td{border-bottom:none}
+.cardList tbody tr{cursor:pointer;transition:background var(--t)}
+.cardList tbody tr:hover,.cardList tbody tr.sel{background:rgba(47,109,246,.06)}
+.tableName{display:flex;align-items:center;gap:10px;min-width:180px}
+.tableFlag{width:30px;height:30px;border-radius:10px;background:var(--glass-soft);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
+.tableTitle{font-weight:800;color:var(--text)}
+.tableSub{font-size:12px;color:var(--sub);margin-top:2px}
+.drop{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;padding:38px 24px;color:var(--sub);transition:border-color var(--t),background var(--t),transform var(--t)}
+.drop svg{width:38px;height:38px;color:var(--accent)}
+.drop strong{color:var(--text);font-size:16px}
+.drop small{font-size:12px;line-height:1.5}
+.drop.over{background:rgba(47,109,246,.08);transform:translateY(-1px)}
+.importError{margin-top:12px;color:var(--danger);font-weight:700;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.16);border-radius:12px;padding:10px 12px}
+.previewBox{margin-top:14px;background:rgba(255,255,255,.44);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.previewGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.previewStat{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.36);padding:12px}
+.previewStat b{display:block;font-size:20px;color:var(--text)}
+.previewStat span{font-size:12px;color:var(--sub)}
+.previewRows{margin-top:14px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.previewRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px}
+.previewRow:last-child{border-bottom:none}
+.previewRow b{color:var(--text)}
+.previewRow span{color:var(--sub)}
+.previewFields{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.fieldChip{border:1px solid var(--line);background:rgba(255,255,255,.36);color:var(--sub);border-radius:999px;padding:4px 9px;font-size:12px;font-weight:700}
+.settingsGroupTitle{margin:20px 3px 8px;color:var(--sub);font-size:12px;font-weight:850;letter-spacing:.04em}
+.setRow{min-height:62px}
+.setIcon{width:36px;height:36px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--accent-weak);color:var(--accent);flex:0 0 auto}
+.setRow.danger .setIcon{background:rgba(220,38,38,.1);color:var(--danger)}
+.setRow .rt b{font-size:15px;color:var(--text)}
+.setRow .rt span{font-size:12px;color:var(--sub);line-height:1.4}
+input[type=checkbox]{accent-color:var(--accent)}
+@media(max-width:1120px){.statgrid{grid-template-columns:repeat(2,minmax(170px,1fr))}.overviewGrid,.toolsGrid{grid-template-columns:1fr}.toolbarActions{margin-left:0}.cardList{overflow-x:auto}}
+@media(max-width:900px){.secretGrid{grid-template-columns:1fr}}
+@media(max-width:760px){.keeperBadge{display:none}.statePill{display:none}.toolbar{display:grid;grid-template-columns:1fr}.toolbar .searchInput,.toolbar select{width:100%;flex:auto}.toolbarActions{width:100%;justify-content:space-between}.statgrid,.previewGrid{grid-template-columns:1fr}.grid{grid-template-columns:minmax(0,1fr);gap:16px}.quickActions{opacity:1;transform:none}.cardInfoGrid{grid-template-columns:1fr}button.logout{width:34px;color:transparent;overflow:hidden}button.logout:before{content:"⏻";color:var(--sub)}}
 
 </style>
 </head>
@@ -214,21 +506,21 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:5px;padd
   <aside id="sidebar">
     <div class="brandRow"><div class="logo">S</div><b>SIMHUB</b></div>
     <nav class="nav" id="nav">
-      <a data-v="overview" class="active">📊 概览</a>
-      <a data-v="cards">💳 卡片管理</a>
-      <a data-v="io">📂 导入与导出</a>
-      <a data-v="settings">⚙️ 设置</a>
+      <a data-v="overview" class="active"><img class="navIcon" src="/static/nav-icons/overview.png" alt=""><span>概览</span></a>
+      <a data-v="cards"><img class="navIcon" src="/static/nav-icons/cards.png" alt=""><span>卡片管理</span></a>
+      <a data-v="tools"><span class="navGlyph"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M20 14h1v1"/><path d="M14 20h1v1"/><path d="M19 19h2v2"/></svg></span><span>eSIM 工具</span></a>
+      <a data-v="io"><img class="navIcon" src="/static/nav-icons/io.png" alt=""><span>导入与导出</span></a>
+      <a data-v="settings"><img class="navIcon" src="/static/nav-icons/settings.png" alt=""><span>设置</span></a>
     </nav>
   </aside>
   <div id="content">
     <header>
-      <button id="menuBtn" class="iconbtn" onclick="document.getElementById('sidebar').classList.toggle('open')"><svg><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-      <h1 id="pageTitle">概览</h1>
-      <span class="dot"></span>
+      <button id="menuBtn" class="iconbtn"><svg><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <div class="titleStack"><h1 id="pageTitle">概览</h1><span class="statePill">已连接</span></div>
       <span class="spacer"></span>
-      <span id="deviceMeta" class="meta"></span>
+      <span id="deviceMeta" class="keeperBadge">Keeper 检查中</span>
       <button class="iconbtn" id="themeBtn" title="深色/浅色"><svg id="themeIcon"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4" y1="4" x2="6" y2="6"/><line x1="18" y1="18" x2="20" y2="20"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4" y1="20" x2="6" y2="18"/><line x1="18" y1="6" x2="20" y2="4"/></svg></button>
-      <button class="sec" id="logoutBtn">断开连接</button>
+      <button class="logout" id="logoutBtn">断开连接</button>
     </header>
     <main id="main"></main>
   </div>
@@ -239,21 +531,43 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:5px;padd
 <div id="confirmHost"></div>
 <div id="toastHost"></div>
 
-<script>
+<script nonce="__CSP_NONCE__">
 const API=location.origin;
 const CSRF="__CSRF_TOKEN__";
+const MAX_IMPORT_BYTES=8*1024*1024;
 if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js").catch(()=>{});}
-const LOGO="data:image/png;base64,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";
+const LOGO="/static/app-icon.jpg";
 document.querySelectorAll(".logo").forEach(e=>{e.textContent="";const i=document.createElement("img");i.src=LOGO;e.appendChild(i);});
 let cards=[]; let view='overview'; let revealed=new Set(); let selectMode=false; let selected=new Set(); let settingsPage='home';
 let cardEls=Object.create(null); let gridEl=null; let emptyEl=null;
 let filterTags=new Set(); let filterFrom=''; let filterTo=''; let advOpen=false;
+let cardViewMode=localStorage.getItem('simhub_card_view')||'cards';
 let maskDefault = localStorage.getItem('simhub_mask')!=='off';
+let esimToolTab=localStorage.getItem('simhub_esim_tool_tab')||'parser';
+let lpaToolMode='manual'; let toolCameraStream=null; let toolScanTimer=null;
+const RECENT_MODS_CLEAR_KEY='simhub_recent_mods_clear_at';
+const CATEGORY_PRESETS=['主号','接码','银行绑定','流量卡','保号','备用','旅行','其他'];
 const EYE='<svg><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF='<svg><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function safeImgURL(u){try{const x=new URL(String(u||''),location.origin);return x.protocol==='https:'&&(x.hostname==='mzstatic.com'||x.hostname.endsWith('.mzstatic.com'))?x.href:'';}catch(e){return '';}}
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.getElementById('toastHost').appendChild(t);setTimeout(()=>t.remove(),1800);}
+function icon(name){const icons={
+  cards:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>',
+  alert:'<svg viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  check:'<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
+  pulse:'<svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 8-6-16-3 8H2"/></svg>',
+  list:'<svg viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>',
+  edit:'<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  copy:'<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  trash:'<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+  upload:'<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8 12 3 7 8"/><path d="M12 3v12"/></svg>',
+  qr:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M20 14h1v1"/><path d="M14 20h1v1"/><path d="M19 19h2v2"/></svg>',
+  clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  empty:'<svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M7.5 4.21 12 6.81l4.5-2.6"/><path d="M7.5 19.79V14.6L3 12"/><path d="m21 12-4.5 2.6v5.19"/><path d="M3.27 6.96 12 12l8.73-5.04"/><path d="M12 22.08V12"/></svg>'
+};return icons[name]||icons.empty;}
+function emptyState(title,desc,actionLabel='',actionId=''){return `<div class="emptyState"><div class="emptyIcon">${icon('empty')}</div><b>${esc(title)}</b><p>${esc(desc)}</p>${actionLabel?`<button class="sec" id="${esc(actionId)}">${esc(actionLabel)}</button>`:''}</div>`;}
 /* 删除确认弹窗(替代浏览器原生 confirm) */
 function confirmDelete(message,onConfirm,confirmText='删除'){
   const host=document.getElementById('confirmHost');
@@ -284,6 +598,7 @@ async function api(path,opts={}){
 
 function logout(){const f=document.createElement('form');f.method='POST';f.action='/logout';const i=document.createElement('input');i.name='csrf_token';i.value=CSRF;f.appendChild(i);document.body.appendChild(f);f.submit();}
 document.getElementById('logoutBtn').onclick=logout;
+document.getElementById('menuBtn').onclick=()=>document.getElementById('sidebar').classList.toggle('open');
 
 /* 主题 */
 function applyTheme(){const dark=localStorage.getItem('simhub_theme');if(dark==='dark')document.body.classList.add('dark');else if(dark==='light')document.body.classList.remove('dark');else document.body.classList.toggle('dark',matchMedia('(prefers-color-scheme:dark)').matches);}
@@ -293,61 +608,362 @@ applyTheme();
 /* 导航 */
 document.getElementById('nav').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;setView(a.dataset.v);document.getElementById('sidebar').classList.remove('open');});
 function setView(v){view=v;document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.v===v));
-  const titles={overview:'概览',cards:'卡片管理',io:'导入与导出',settings:'设置'};
-  document.getElementById('pageTitle').textContent=titles[v];selectMode=false;selected.clear();settingsPage='home';render();}
+  stopToolCamera();
+  clearGiffTimeTimer();
+  const titles={overview:'概览',cards:'卡片管理',tools:'eSIM 工具',io:'导入与导出',settings:'设置'};
+  document.getElementById('pageTitle').textContent=titles[v]||'概览';selectMode=false;selected.clear();settingsPage='home';render();}
 
 async function enterApp(){await loadStatus();await loadCountries();await loadCards();}
-async function loadStatus(){try{const s=await api('/api/status');document.getElementById('deviceMeta').textContent=(s.deviceName||'')+' · '+(s.connectedDevices||0)+' 台在线';}catch(e){}}
+function updateKeeperStatus(s){
+  const el=document.getElementById('deviceMeta');if(!el)return;
+  const n=s&&Number.isFinite(+s.connectedDevices)?+s.connectedDevices:0;
+  el.textContent=`Keeper 在线 · ${n} 台`;
+}
+async function loadStatus(){try{const s=await api('/api/status');updateKeeperStatus(s);}catch(e){}}
 async function loadCards(){try{cards=await api('/api/cards')||[];preloadBgs();render();}catch(e){toast(e.message);}}
 function preloadBgs(){cards.forEach(c=>{const u=bgByAsset[c.cardBackgroundAssetName];if(u){const i=new Image();i.src=u;}});}
 
 /* 渲染分发 */
 const M=()=>document.getElementById('main');
-function render(){ if(view==='overview')renderOverview(); else if(view==='cards')renderCards(); else if(view==='io')renderIO(); else renderSettings(); }
+function render(){ if(view==='cards')renderCards(); else if(view==='tools')renderESIMTools(); else if(view==='io')renderIO(); else if(view==='settings')renderSettings(); else renderOverview(); }
 
 function daysLeft(c){return Math.ceil((new Date(c.expiryDate)-new Date())/86400000);}
+function fmtDate(v){if(!v)return '未设置';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleDateString();}
+function cardName(c){return c.carrier||c.plan||c.phoneNumber||'未命名';}
+function cardCountry(c){return c.countryName||c.flag||'未知地区';}
+function statusInfo(c){
+  if(!c.expiryDate||c.isLongTerm)return {type:'ok',label:c.isLongTerm?'长期保号':'正常',hint:c.isLongTerm?'长期':'未设置到期'};
+  const d=daysLeft(c);
+  if(!Number.isFinite(d))return {type:'neutral',label:'未知',hint:'日期异常'};
+  if(d<0)return {type:'danger',label:'已过期',hint:`过期 ${-d} 天`};
+  if(d<=7)return {type:'warn',label:'即将到期',hint:`剩余 ${d} 天`};
+  return {type:'ok',label:'正常',hint:`剩余 ${d} 天`};
+}
+function statusBadge(c,compact=false){const s=statusInfo(c);return `<span class="statusBadge ${s.type}" title="${esc(s.hint)}">${esc(compact?s.label:s.label)}</span>`;}
+function categoryLabel(c){return (c.category||'未分类').trim();}
+function categoryChip(c){return `<span class="categoryChip">${esc(categoryLabel(c))}</span>`;}
+function percent(n,total){return total?Math.round(n/total*100):0;}
 function isoNoMillis(d){return d.toISOString().replace(/\.\d{3}Z$/,'Z');}
 function addDays(d,n){const x=new Date(d.getTime());x.setDate(x.getDate()+n);return x;}
 function dateOnlyISO(v){return v?v+'T00:00:00Z':'';}
 function daySpan(a,b){const n=Math.round((b-a)/86400000);return Number.isFinite(n)&&n>0?n:30;}
+function moneyNumber(v){
+  const m=String(v||'').replace(/,/g,'.').match(/-?\d+(?:\.\d+)?/);
+  return m?Number(m[0]):0;
+}
+function billingPeriodDays(c){
+  const explicit=Number(c.renewDays||c.renewalIntervalValue);
+  if(Number.isFinite(explicit)&&explicit>0)return explicit;
+  const a=new Date(c.activationDate), b=new Date(c.expiryDate);
+  const span=daySpan(a,b);
+  return span>0?span:30;
+}
+function formatMoney(n,currency){
+  if(!Number.isFinite(n))n=0;
+  const fixed=n>=100?0:(n>=10?1:2);
+  return `${n.toFixed(fixed)} ${currency||'USD'}`;
+}
+function costSummary(cards){
+  const byCurrency={};
+  cards.forEach(c=>{
+    const amount=moneyNumber(c.price);
+    if(!amount)return;
+    const currency=(c.currencyCode||'USD').toUpperCase();
+    const monthly=amount/billingPeriodDays(c)*30.4375;
+    if(!byCurrency[currency])byCurrency[currency]={monthly:0,yearly:0,count:0};
+    byCurrency[currency].monthly+=monthly;
+    byCurrency[currency].yearly+=monthly*12;
+    byCurrency[currency].count+=1;
+  });
+  return Object.entries(byCurrency).sort((a,b)=>b[1].monthly-a[1].monthly);
+}
+function upcomingCards(days=90,limit=8){
+  return cards.filter(c=>!c.isLongTerm&&Number.isFinite(daysLeft(c))&&daysLeft(c)>=0&&daysLeft(c)<=days)
+    .sort((a,b)=>daysLeft(a)-daysLeft(b)).slice(0,limit);
+}
+function riskItems(limit=8){
+  const out=[];
+  cards.forEach(c=>{
+    const d=daysLeft(c);
+    const hasLPA=!!(c.smdpAddress||c.activationCode);
+    if(Number.isFinite(d)&&d<0)out.push({card:c,type:'danger',title:'已过期',meta:`${cardName(c)} · ${cardCountry(c)} · 过期 ${-d} 天`});
+    else if(Number.isFinite(d)&&d<=7&&!c.isLongTerm)out.push({card:c,type:'warn',title:'即将到期',meta:`${cardName(c)} · ${cardCountry(c)} · 剩余 ${d} 天`});
+    if(c.reminderMode==='off'&&!c.isLongTerm)out.push({card:c,type:'warn',title:'提醒关闭',meta:`${cardName(c)} · 到期提醒已关闭`});
+    if(hasLPA&&(!c.smdpAddress||!c.activationCode))out.push({card:c,type:'warn',title:'缺少 LPA',meta:`${cardName(c)} · 未完整保存 SM-DP+ / 激活码`});
+    if(!c.carrierAppIconURLString&&!c.carrierAppName)out.push({card:c,type:'neutral',title:'缺少运营商 App',meta:`${cardName(c)} · 可补充 App 入口或图标`});
+  });
+  const order={danger:0,warn:1,neutral:2};
+  return out.sort((a,b)=>(order[a.type]??3)-(order[b.type]??3)).slice(0,limit);
+}
+function recentChangesCutoffTs(){
+  const t=Number(localStorage.getItem(RECENT_MODS_CLEAR_KEY)||0);
+  return Number.isFinite(t)&&t>0?t:0;
+}
+function costPanelHTML(){
+  const costs=costSummary(cards);
+  if(!costs.length)return emptyState('暂无费用数据','给卡片填写价格和币种后，这里会估算月度 / 年度保号成本。');
+  return `<div class="costList">${costs.map(([currency,v])=>`<div class="costRow"><div><div class="rowTitle">${esc(currency)}</div><div class="rowMeta">${v.count} 张卡参与估算 · 按周期折算</div></div><div class="rowValue">${esc(formatMoney(v.monthly,currency))}<div class="rowMeta">${esc(formatMoney(v.yearly,currency))}/年</div></div></div>`).join('')}</div>`;
+}
+function timelineHTML(){
+  const list=upcomingCards();
+  if(!list.length)return emptyState('90 天内暂无到期','到期卡片会按时间线显示，方便提前续费或处理。');
+  return `<div class="timelineList">${list.map(c=>`<div class="timelineRow"><div><div class="rowTitle">${esc(cardName(c))}</div><div class="rowMeta">${esc(cardCountry(c))} · ${esc(c.category||'未分类')} · ${esc(statusInfo(c).hint)}</div></div><div class="timelineDate">${esc(fmtDate(c.expiryDate))}</div></div>`).join('')}</div>`;
+}
+function riskPanelHTML(){
+  const items=riskItems();
+  if(!items.length)return emptyState('暂无明显风险','没有已过期、近期到期或资料缺失的卡片。');
+  return `<div class="riskList">${items.map(x=>`<div class="riskRow"><div class="riskMain"><span class="riskDot ${x.type==='danger'?'danger':''}"></span><div style="min-width:0"><div class="rowTitle">${esc(x.title)}</div><div class="rowMeta">${esc(x.meta)}</div></div></div><button class="sec mini riskOpen" data-card-id="${esc(x.card.id)}">详情</button></div>`).join('')}</div>`;
+}
+
+function renderESIMTools(){
+  stopToolCamera();
+  if(esimToolTab!=='parser'){
+    esimToolTab='parser';
+    localStorage.setItem('simhub_esim_tool_tab','parser');
+  }
+  M().innerHTML='<div id="esimToolHost"></div>';
+  renderParserTools();
+}
+
+function renderParserTools(){
+  const host=dG('esimToolHost');if(!host)return;
+  host.innerHTML=`<div class="toolsGrid">
+    <section class="toolPanel">
+      <h3>eSIM 解析器</h3><p class="sub" style="margin:0">离线处理 eSIM 激活码：支持粘贴、图片二维码、摄像头扫描，并生成标准 LPA 字符串。</p>
+      <div class="seg"><button id="lpaManual" class="${lpaToolMode==='manual'?'on':''}">手动输入</button><button id="lpaImage" class="${lpaToolMode==='image'?'on':''}">图片识别</button><button id="lpaCamera" class="${lpaToolMode==='camera'?'on':''}">摄像头</button></div>
+      <div id="lpaToolBody"></div>
+    </section>
+    <section class="toolPanel">
+      <h3>输出</h3><p class="sub" style="margin-top:0">生成结果只在浏览器和 SIMHUB 服务内处理，不会发往第三方二维码服务。</p>
+      <div class="lpaOutput">
+        <div class="qrBox" id="qrBox"><span class="sub">输入 SM-DP+ 和激活码后生成二维码</span></div>
+        <div class="lpaText" id="lpaText">LPA:1$</div>
+        <div class="toolActions"><button id="copyLPA" disabled>复制 LPA</button><button class="sec" id="fillCardFromLPA" disabled>带入新卡片</button><button class="sec" id="copyIOSUrl" disabled>复制 iOS 安装链接</button></div>
+      </div>
+    </section>
+  </div>`;
+  dG('lpaManual').onclick=()=>{lpaToolMode='manual';renderESIMTools();};
+  dG('lpaImage').onclick=()=>{lpaToolMode='image';renderESIMTools();};
+  dG('lpaCamera').onclick=()=>{lpaToolMode='camera';renderESIMTools();};
+  renderLPABody();
+  updateLPAOutput();
+}
+
+function renderLPABody(){
+  const host=dG('lpaToolBody');if(!host)return;
+  if(lpaToolMode==='image'){
+    host.innerHTML=`<div class="toolDrop" id="qrDrop">${icon('qr')}<b>上传 eSIM 二维码图片</b><span>支持 App 里的 LPA 二维码；浏览器支持 BarcodeDetector 时会本地识别。</span><label style="color:var(--accent);cursor:pointer;font-weight:800">选择图片<input id="qrFile" type="file" accept="image/*" class="hidden"></label></div><div id="qrDetectMsg" class="sub" style="margin-top:12px"></div>${lpaFieldsHTML()}`;
+    dG('qrFile').onchange=()=>dG('qrFile').files[0]&&detectQRFile(dG('qrFile').files[0]);
+    const drop=dG('qrDrop');
+    ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over');}));
+    ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over');}));
+    drop.addEventListener('drop',ev=>{const f=ev.dataTransfer.files[0];if(f)detectQRFile(f);});
+  }else if(lpaToolMode==='camera'){
+    host.innerHTML=`<div class="cameraBox"><video id="qrVideo" playsinline muted></video><div class="toolActions"><button id="startCam">开始扫描</button><button class="sec" id="stopCam">停止</button></div><div id="qrDetectMsg" class="sub">需要 HTTPS 和摄像头权限；识别过程在本机浏览器完成。</div></div>${lpaFieldsHTML()}`;
+    dG('startCam').onclick=startToolCamera;dG('stopCam').onclick=stopToolCamera;
+  }else{
+    host.innerHTML=`<div class="field"><label>粘贴完整 LPA 字符串</label><textarea id="rawLPA" rows="4" placeholder="LPA:1$smdp.example.com$MATCHINGID$CONFIRM"></textarea></div><div class="toolActions"><button id="parseRawLPA">解析并回填</button><button class="sec" id="clearLPA">清空</button></div>${lpaFieldsHTML()}`;
+    dG('parseRawLPA').onclick=()=>parseLPAString(dG('rawLPA').value);
+    dG('clearLPA').onclick=clearLPAFields;
+    dG('rawLPA').addEventListener('input',e=>{if((e.target.value||'').toUpperCase().includes('LPA:1$'))parseLPAString(e.target.value,true);});
+  }
+  ['lpaSmdp','lpaActivation','lpaConfirmation'].forEach(id=>dG(id).addEventListener('input',updateLPAOutput));
+}
+
+function lpaFieldsHTML(){return `<div style="height:14px"></div>
+  <div class="field"><label>SM-DP+ 地址</label><input id="lpaSmdp" placeholder="smdp.example.com"></div>
+  <div class="field"><label>激活码 / Matching ID</label><input id="lpaActivation" placeholder="MATCHINGID"></div>
+  <div class="field"><label>确认码（可选）</label><input id="lpaConfirmation" placeholder="Confirmation Code"></div>`;}
+
+function currentLPAData(){
+  const smdp=(dG('lpaSmdp')?.value||'').trim(), activation=(dG('lpaActivation')?.value||'').trim(), confirmation=(dG('lpaConfirmation')?.value||'').trim();
+  const lpa=smdp&&activation?`LPA:1$${smdp}$${activation}${confirmation?'$'+confirmation:''}`:'LPA:1$';
+  return {smdpAddress:smdp,activationCode:activation,confirmationCode:confirmation,lpa,valid:!!(smdp&&activation)};
+}
+
+function updateLPAOutput(){
+  const data=currentLPAData(), out=dG('lpaText'), box=dG('qrBox');
+  if(out)out.textContent=data.lpa;
+  ['copyLPA','fillCardFromLPA','copyIOSUrl'].forEach(id=>{const b=dG(id);if(b)b.disabled=!data.valid;});
+  if(dG('copyLPA'))dG('copyLPA').onclick=()=>copyText(data.lpa,'LPA 已复制');
+  if(dG('copyIOSUrl'))dG('copyIOSUrl').onclick=()=>copyText(iosInstallURL(data.lpa),'iOS 安装链接已复制');
+  if(dG('fillCardFromLPA'))dG('fillCardFromLPA').onclick=()=>openDrawerFromLPA(currentLPAData());
+  if(!box)return;
+  if(!data.valid){box.innerHTML='<span class="sub">输入 SM-DP+ 和激活码后生成二维码</span>';return;}
+  const svg=makeQRSVG(data.lpa);
+  box.innerHTML=svg||'<span class="sub">LPA 太长，当前本地二维码生成器暂不支持；仍可复制 LPA 字符串。</span>';
+}
+
+async function parseLPAString(value,silent=false){
+  if(!value)return;
+  try{const r=await api('/api/lpa/parse',{method:'POST',body:JSON.stringify({value})});
+    applyParsedLPA(r);if(!silent)toast('已解析 LPA');}
+  catch(e){if(!silent)toast(e.message||'解析失败');}
+}
+function applyParsedLPA(r){
+  if(dG('lpaSmdp'))dG('lpaSmdp').value=r.smdpAddress||'';
+  if(dG('lpaActivation'))dG('lpaActivation').value=r.activationCode||'';
+  if(dG('lpaConfirmation'))dG('lpaConfirmation').value=r.confirmationCode||'';
+  if(dG('rawLPA'))dG('rawLPA').value=r.lpa||'';
+  updateLPAOutput();
+}
+function clearLPAFields(){['rawLPA','lpaSmdp','lpaActivation','lpaConfirmation'].forEach(id=>{const el=dG(id);if(el)el.value='';});updateLPAOutput();}
+function iosInstallURL(lpa){return 'https://esimsetup.apple.com/esim_qrcode_provisioning?carddata='+encodeURIComponent(lpa);}
+async function copyText(text,msg){try{await navigator.clipboard.writeText(text);toast(msg);}catch(e){toast('复制失败');}}
+function openDrawerFromLPA(data){
+  const fresh=data&&data.valid?data:currentLPAData();
+  if(!fresh.valid){toast('请先解析或填写完整 LPA');return;}
+  openDrawer(Object.assign(defaultCardSeed(),{smdpAddress:fresh.smdpAddress,activationCode:fresh.activationCode,confirmationCode:fresh.confirmationCode||'',carrier:'',plan:''}));
+}
+function defaultCardSeed(){const now=new Date();return {activationDate:isoNoMillis(now),expiryDate:isoNoMillis(addDays(now,30)),createdAt:isoNoMillis(now),isLongTerm:false,renewDays:30,renewalUnit:'days',renewalIntervalValue:30,tags:[],category:''};}
+
+async function detectQRFile(file){
+  const msg=dG('qrDetectMsg');if(msg)msg.textContent='正在识别图片…';
+  try{
+    const text=await detectBarcodeFromImage(file);
+    if(!text)throw new Error('未识别到二维码');
+    await parseLPAString(text);
+    if(msg)msg.textContent='已识别并解析二维码。';
+  }catch(e){if(msg)msg.textContent=e.message||'识别失败';}
+}
+async function detectBarcodeFromImage(file){
+  if(!('BarcodeDetector' in window))throw new Error('当前浏览器不支持图片二维码识别，请改用手动粘贴。');
+  const detector=new BarcodeDetector({formats:['qr_code']});
+  const bitmap=await createImageBitmap(file);
+  const codes=await detector.detect(bitmap);
+  if(bitmap.close)bitmap.close();
+  return (codes[0]&&codes[0].rawValue)||'';
+}
+async function startToolCamera(){
+  const msg=dG('qrDetectMsg'), video=dG('qrVideo');
+  if(!('BarcodeDetector' in window)){if(msg)msg.textContent='当前浏览器不支持摄像头二维码识别。';return;}
+  try{
+    stopToolCamera();
+    toolCameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    video.srcObject=toolCameraStream;await video.play();
+    const detector=new BarcodeDetector({formats:['qr_code']});
+    if(msg)msg.textContent='扫描中，对准 eSIM 二维码。';
+    toolScanTimer=setInterval(async()=>{try{const codes=await detector.detect(video);if(codes[0]&&codes[0].rawValue){stopToolCamera();await parseLPAString(codes[0].rawValue);if(msg)msg.textContent='已识别并解析二维码。';}}catch(e){}},700);
+  }catch(e){if(msg)msg.textContent='无法打开摄像头，请检查权限或使用图片识别。';}
+}
+function stopToolCamera(){
+  if(toolScanTimer){clearInterval(toolScanTimer);toolScanTimer=null;}
+  if(toolCameraStream){toolCameraStream.getTracks().forEach(t=>t.stop());toolCameraStream=null;}
+  const video=document.getElementById('qrVideo');if(video)video.srcObject=null;
+}
+
+function makeQRSVG(text){
+  const bytes=[...new TextEncoder().encode(text)];
+  const specs={1:[21,19,7,[]],2:[25,34,10,[6,18]],3:[29,55,15,[6,22]],4:[33,80,20,[6,26]],5:[37,108,26,[6,30]]};
+  let spec=null;
+  for(const v of Object.keys(specs)){const s=specs[v];if(bytes.length<=Math.floor((s[1]*8-12)/8)){spec=s;break;}}
+  if(!spec)return '';
+  const [size,dataLen,eccLen,align]=spec, modules=Array.from({length:size},()=>Array(size).fill(false)), func=Array.from({length:size},()=>Array(size).fill(false));
+  const set=(r,c,v,f=true)=>{if(r>=0&&r<size&&c>=0&&c<size){modules[r][c]=!!v;if(f)func[r][c]=true;}};
+  const finder=(r,c)=>{for(let y=-1;y<=7;y++)for(let x=-1;x<=7;x++){const rr=r+y,cc=c+x;if(rr<0||rr>=size||cc<0||cc>=size)continue;const v=y>=0&&y<=6&&x>=0&&x<=6&&(y===0||y===6||x===0||x===6||(y>=2&&y<=4&&x>=2&&x<=4));set(rr,cc,v);}};
+  finder(0,0);finder(0,size-7);finder(size-7,0);
+  for(let i=8;i<size-8;i++){set(6,i,i%2===0);set(i,6,i%2===0);}
+  for(const r of align)for(const c of align){if(func[r][c])continue;for(let y=-2;y<=2;y++)for(let x=-2;x<=2;x++)set(r+y,c+x,Math.max(Math.abs(x),Math.abs(y))!==1);}
+  function reserveFormat(){for(let i=0;i<6;i++)set(8,i,false);set(8,7,false);set(8,8,false);set(7,8,false);for(let i=9;i<15;i++)set(14-i,8,false);for(let i=0;i<8;i++)set(size-1-i,8,false);for(let i=8;i<15;i++)set(8,size-15+i,false);set(size-8,8,true);}
+  reserveFormat();
+  const bits=[];const push=(val,len)=>{for(let i=len-1;i>=0;i--)bits.push((val>>>i)&1);};
+  push(4,4);push(bytes.length,8);bytes.forEach(b=>push(b,8));
+  const cap=dataLen*8;for(let i=0;i<Math.min(4,cap-bits.length);i++)bits.push(0);while(bits.length%8)bits.push(0);
+  const data=[];for(let i=0;i<bits.length;i+=8)data.push(bits.slice(i,i+8).reduce((a,b)=>a*2+b,0));for(let p=0;data.length<dataLen;p++)data.push(p%2?0x11:0xec);
+  const code=data.concat(rs(data,eccLen)), dbits=[];code.forEach(b=>pushTo(dbits,b,8));
+  let bi=0, up=true;for(let right=size-1;right>=1;right-=2){if(right===6)right--;for(let vert=0;vert<size;vert++){const r=up?size-1-vert:vert;for(let j=0;j<2;j++){const c=right-j;if(func[r][c])continue;let bit=bi<dbits.length?dbits[bi++]:0;if((r+c)%2===0)bit^=1;modules[r][c]=!!bit;}}up=!up;}
+  drawFormat(0);
+  const q=4, cell=8, dim=(size+q*2)*cell;let out=`<svg viewBox="0 0 ${dim} ${dim}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LPA QR"><rect width="${dim}" height="${dim}" fill="#fff"/>`;
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(modules[r][c])out+=`<rect x="${(c+q)*cell}" y="${(r+q)*cell}" width="${cell}" height="${cell}" fill="#000"/>`;
+  return out+'</svg>';
+  function pushTo(arr,val,len){for(let i=len-1;i>=0;i--)arr.push((val>>>i)&1);}
+  function gfTables(){let exp=Array(512),log=Array(256),x=1;for(let i=0;i<255;i++){exp[i]=x;log[x]=i;x<<=1;if(x&0x100)x^=0x11d;}for(let i=255;i<512;i++)exp[i]=exp[i-255];return{exp,log};}
+  function rs(data,deg){const {exp,log}=gfTables(),mul=(a,b)=>a&&b?exp[log[a]+log[b]]:0;let gen=[1];for(let i=0;i<deg;i++){const next=Array(gen.length+1).fill(0);for(let j=0;j<gen.length;j++){next[j]^=mul(gen[j],1);next[j+1]^=mul(gen[j],exp[i]);}gen=next;}const res=Array(deg).fill(0);for(const b of data){const factor=b^res.shift();res.push(0);for(let i=0;i<deg;i++)res[i]^=mul(gen[i+1],factor);}return res;}
+  function drawFormat(mask){let data=(1<<3)|mask,bits=data<<10;for(let i=14;i>=10;i--)if((bits>>>i)&1)bits^=0x537<<(i-10);bits=((data<<10)|bits)^0x5412;const bit=i=>((bits>>>i)&1)!==0;for(let i=0;i<6;i++)set(8,i,bit(i));set(8,7,bit(6));set(8,8,bit(7));set(7,8,bit(8));for(let i=9;i<15;i++)set(14-i,8,bit(i));for(let i=0;i<8;i++)set(size-1-i,8,bit(i));for(let i=8;i<15;i++)set(8,size-15+i,bit(i));set(size-8,8,true);}
+}
 
 function renderOverview(){
   const total=cards.length;const exp=cards.filter(c=>daysLeft(c)<0).length;const soon=cards.filter(c=>{const d=daysLeft(c);return d>=0&&d<=7;}).length;
+  const recentCutoff=recentChangesCutoffTs();
   const byCountry={};cards.forEach(c=>{const k=c.countryName||c.flag||'未知';byCountry[k]=(byCountry[k]||0)+1;});
   const top=Object.entries(byCountry).sort((a,b)=>b[1]-a[1]).slice(0,6);const max=Math.max(1,...top.map(t=>t[1]));
-  const recent=[...cards].sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0)).slice(0,5);
+  const byCategory={};cards.forEach(c=>{const k=categoryLabel(c);byCategory[k]=(byCategory[k]||0)+1;});
+  const cats=Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).slice(0,8);const catMax=Math.max(1,...cats.map(t=>t[1]));
+  const recent=[...cards]
+    .sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0))
+    .filter(c=>{const t=Date.parse(c.updatedAt||'');return !recentCutoff?true:(Number.isNaN(t)?false:t>recentCutoff);})
+    .slice(0,5);
+  const risks=riskItems();
+  const stat=(cls,ic,n,label,hint,badge='')=>`<div class="stat ${cls}"><div class="statTop"><div class="statIcon">${icon(ic)}</div>${badge}</div><div><div class="n">${n}</div><div class="l">${label}</div><div class="hint">${hint}</div></div></div>`;
   M().innerHTML=`
     <div class="statgrid">
-      <div class="stat"><div class="n">${total}</div><div class="l">卡片总数</div></div>
-      <div class="stat warn"><div class="n">${soon}</div><div class="l">7 天内到期</div></div>
-      <div class="stat danger"><div class="n">${exp}</div><div class="l">已过期</div></div>
-      <div class="stat"><div class="n">●</div><div class="l">服务运行中</div></div>
+      ${stat('primary','cards',total,'卡片总数','当前纳管的 SIM / eSIM 卡片')}
+      ${stat('warn','alert',soon,'7 天内到期','需要近期关注的卡片',soon?'<span class="statusBadge warn">需关注</span>':'<span class="statusBadge ok">正常</span>')}
+      ${stat('danger','alert',exp,'已过期','已经超过到期时间的卡片',exp?'<span class="statusBadge danger">处理</span>':'<span class="statusBadge ok">正常</span>')}
+      ${stat(risks.length?'warn':'ok','pulse',risks.length,'风险项','到期、资料缺失或提醒关闭的卡片',risks.length?'<span class="statusBadge warn">需整理</span>':'<span class="statusBadge ok">正常</span>')}
     </div>
-    <div class="panel"><h3>国家 / 地区分布</h3>${top.map(([k,v])=>`<div class="bar"><span style="width:90px">${esc(k)}</span><div class="track"><div class="fill" style="width:${v/max*100}%"></div></div><span>${v}</span></div>`).join('')||'<span class="sub">暂无数据</span>'}</div>
-    <div class="panel"><h3>最近修改</h3>${recent.map(c=>`<div class="recent"><span>${esc(c.flag||'🌐')} ${esc(c.carrier||'未命名')}</span><span class="sub">${c.updatedAt?new Date(c.updatedAt).toLocaleString():''}</span></div>`).join('')||'<span class="sub">暂无</span>'}</div>
-    <div class="panel"><h3>最近活动</h3><div class="acts" id="actList"><span class="sub">加载中…</span></div></div>`;
+    <div class="overviewGrid">
+      <div>
+        <div class="panel"><div class="sectionHead"><h3>费用 / 账单估算</h3><span class="miniPill">按周期折算</span></div>${costPanelHTML()}</div>
+        <div class="panel"><h3>90 天到期时间线</h3>${timelineHTML()}</div>
+        <div class="panel"><h3>国家 / 地区分布</h3><div class="distList">${top.map(([k,v])=>`<div class="distRow"><div class="distMeta"><span class="distName">${esc(k)}</span><span class="miniPill">${percent(v,total)}%</span></div><span class="distCount">${v}</span><div class="distTrack"><div class="distFill" style="width:${v/max*100}%"></div></div></div>`).join('')||emptyState('暂无国家数据','新建卡片并选择国家 / 地区后，分布会显示在这里。')}</div></div>
+        <div class="panel"><h3>用途分类</h3><div class="distList">${cats.map(([k,v])=>`<div class="distRow"><div class="distMeta"><span class="distName">${esc(k)}</span><span class="miniPill">${percent(v,total)}%</span></div><span class="distCount">${v}</span><div class="distTrack"><div class="distFill" style="width:${v/catMax*100}%"></div></div></div>`).join('')||emptyState('暂无分类数据','给卡片设置用途分类后，这里会显示用途结构。')}</div></div>
+        <div class="panel"><div class="sectionHead"><h3>最近修改</h3><button class="sec mini" id="recentClear">清理</button></div><div class="recentList">${recent.map(c=>`<div class="recentItem"><div class="recentMain"><span class="recentFlag">${esc(c.flag||'🌐')}</span><div style="min-width:0"><div class="recentTitle">${esc(cardName(c))}</div><div class="recentMeta">${esc(cardCountry(c))} · 更新卡片信息 · ${esc(fmtDate(c.expiryDate))} 到期</div></div></div><div style="text-align:right">${statusBadge(c)}<div class="recentMeta">${c.updatedAt?esc(new Date(c.updatedAt).toLocaleString()):'未记录'}</div></div></div>`).join('')||emptyState('暂无修改记录','卡片新增、编辑或导入后，最近修改会显示在这里。')}</div></div>
+      </div>
+      <div>
+        <div class="panel"><div class="sectionHead"><h3>风险与资料缺口</h3><button class="sec mini" id="goCardsRisk">整理卡片</button></div>${riskPanelHTML()}</div>
+        <div class="panel"><div class="sectionHead"><h3>最近活动</h3><button class="sec mini" id="actClear">清除</button></div><div class="acts" id="actList"><span class="sub">加载中…</span></div></div>
+      </div>
+    </div>`;
+  dG('actClear').onclick=clearActivity;
+  dG('recentClear').onclick=clearRecentChanges;
+  dG('goCardsRisk').onclick=()=>setView('cards');
+  M().querySelectorAll('.riskOpen').forEach(btn=>btn.onclick=()=>openDetailById(btn.dataset.cardId));
   loadActivity();
 }
 function fmtTime(s){if(!s)return '';let d=new Date(s.replace(' ','T')+(/[zZ]$/.test(s)?'':'Z'));return isNaN(d)?s:d.toLocaleString();}
 async function loadActivity(){
   const host=dG('actList');if(!host)return;
   try{const acts=await api('/api/activity')||[];
-    if(!acts.length){host.innerHTML='<span class="sub">暂无活动</span>';return;}
+    if(!acts.length){
+      host.innerHTML=emptyState('暂无活动','卡片新增、编辑、导入等操作会显示在这里。','前往卡片管理','goCardsFromEmpty');
+      const btn=dG('goCardsFromEmpty');if(btn)btn.onclick=()=>setView('cards');
+      return;
+    }
     const ic={create:'+',edit:'✎',delete:'✕',import:'↓'};
     host.innerHTML=acts.slice(0,15).map(a=>`<div class="act"><div class="ai ${esc(a.action)}">${ic[a.action]||'•'}</div><div class="at"><b>${esc(a.label||'—')}</b> <span class="as">${esc(a.note||a.action)}</span></div><span class="as">${esc(fmtTime(a.createdAt))}</span></div>`).join('');
   }catch(e){host.innerHTML='<span class="sub">加载失败</span>';}
 }
+async function clearActivity(){
+  if(!confirm('确定清除最近活动记录吗?'))return;
+  const btn=dG('actClear');if(btn){btn.disabled=true;btn.textContent='清除中…';}
+  try{await api('/api/activity',{method:'DELETE'});toast('已清除最近活动');loadActivity();}
+  catch(e){toast(e.message||'清除失败');}
+  finally{if(btn){btn.disabled=false;btn.textContent='清除';}}
+}
+function clearRecentChanges(){
+  if(!confirm('确定清除最近修改列表吗?'))return;
+  localStorage.setItem(RECENT_MODS_CLEAR_KEY,String(Date.now()));
+  render();
+}
 
 function cardContentInner(c){
-  const d=daysLeft(c);let badge='';if(d<0)badge='<span class="badge exp">已过期</span>';else if(d<=7)badge='<span class="badge soon">'+d+'天</span>';
   const rev=revealed.has(c.id)||!maskDefault;
   const phoneTxt=c.phoneNumber?(rev?esc(c.phoneNumber):esc(maskPhone(c.phoneNumber))):'—';
   const eye=c.phoneNumber?`<button class="iconbtn eyebtn">${rev?EYEOFF:EYE}</button>`:'';
-  const icon=c.carrierAppIconURLString?`<img src="${esc(c.carrierAppIconURLString)}" class="appicon" style="width:30px;height:30px">`:`<span class="flag">${esc(c.flag||'🌐')}</span>`;
-  return `${icon}
-    <h3>${esc(c.carrier||'未命名')} ${badge}</h3>
-    <div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div>
-    <div class="row"><span class="phone">${phoneTxt}${eye}</span><span>${c.expiryDate?new Date(c.expiryDate).toLocaleDateString():''}</span></div>`;
+  const appIcon=safeImgURL(c.carrierAppIconURLString);
+  const iconHtml=appIcon?`<img src="${esc(appIcon)}" class="appicon" style="width:30px;height:30px">`:`<span class="flag">${esc(c.flag||'🌐')}</span>`;
+  const s=statusInfo(c);
+  return `<div class="cardHead">
+    <div class="cardIdentity">${iconHtml}<div style="min-width:0"><div class="cardTitle">${esc(cardName(c))}</div><div class="cardCountry">${esc(cardCountry(c))}</div></div></div>
+    ${statusBadge(c)}
+  </div>
+  <div class="cardMetaLine"><div class="cardMetaMain">${categoryChip(c)}<span>${esc(c.plan||c.transactionNotes||'未设置套餐')}</span></div><b class="phone">${phoneTxt}${eye}</b></div>
+  <div class="cardFoot"><div class="cardDue"><div><span>到期</span><b>${esc(fmtDate(c.expiryDate))}</b></div><div><span>状态</span><b>${esc(s.hint)}</b></div></div><span class="quickActions">
+    <button class="iconbtn quickEdit" title="编辑" aria-label="编辑">${icon('edit')}</button>
+    <button class="iconbtn quickCopy" title="复制号码" aria-label="复制号码">${icon('copy')}</button>
+    <button class="iconbtn quickDelete" title="删除" aria-label="删除">${icon('trash')}</button>
+  </span></div>`;
 }
 function ensureCardEl(c){
   let el=cardEls[c.id];
@@ -356,8 +972,11 @@ function ensureCardEl(c){
     el.innerHTML=`<div class="card-content"></div><div class="selcheck"></div><button class="iconbtn moreBtn" aria-label="详情">⋯</button>`;
     el.addEventListener('click',(ev)=>{const id=el.dataset.id;
       if(ev.target.closest('.eyebtn')){ev.stopPropagation();toggleEye(id);return;}
+      if(ev.target.closest('.quickEdit')){ev.stopPropagation();const c=cards.find(x=>x.id===id);if(c)openDrawer(c);return;}
+      if(ev.target.closest('.quickCopy')){ev.stopPropagation();copyCardPhone(id);return;}
+      if(ev.target.closest('.quickDelete')){ev.stopPropagation();const c=cards.find(x=>x.id===id);if(c)delCard(c);return;}
       if(ev.target.closest('.moreBtn')){ev.stopPropagation();openDetailById(id);return;}
-      if(selectMode)toggleSel(id);});
+      selectMode?toggleSel(id):openDetailById(id);});
     cardEls[c.id]=el;
   }
   return el;
@@ -375,15 +994,24 @@ function updateCardEl(el,c){
   el.querySelector('.selcheck').textContent=selected.has(c.id)?'✓':'';
 }
 function toggleEye(id){if(revealed.has(id))revealed.delete(id);else revealed.add(id);const el=cardEls[id];const c=cards.find(x=>x.id===id);if(el&&c)el.querySelector('.card-content').innerHTML=cardContentInner(c);}
+async function copyCardPhone(id){
+  const c=cards.find(x=>x.id===id);if(!c||!c.phoneNumber)return toast('这张卡没有号码');
+  try{await navigator.clipboard.writeText(c.phoneNumber);toast('号码已复制');}
+  catch(e){toast('复制失败');}
+}
 
 function filteredCards(){
   const q=(document.getElementById('search')?.value||'').toLowerCase();
   const country=document.getElementById('fCountry')?.value||'';
   const status=document.getElementById('fStatus')?.value||'';
+  const carrier=document.getElementById('fCarrier')?.value||'';
+  const category=document.getElementById('fCategory')?.value||'';
   const sort=document.getElementById('fSort')?.value||'order';
   let list=cards.filter(c=>{
-    if(q&&![c.carrier,c.countryName,c.phoneNumber,c.plan].join(' ').toLowerCase().includes(q))return false;
+    if(q&&![c.carrier,c.countryName,c.phoneNumber,c.plan,c.category].join(' ').toLowerCase().includes(q))return false;
     if(country&&(c.countryName||'')!==country)return false;
+    if(carrier&&(c.carrier||'')!==carrier)return false;
+    if(category&&categoryLabel(c)!==category)return false;
     if(filterTags.size&&!(c.tags||[]).some(t=>filterTags.has(t)))return false;
     if(filterFrom&&c.expiryDate&&new Date(c.expiryDate)<new Date(filterFrom))return false;
     if(filterTo&&c.expiryDate&&new Date(c.expiryDate)>new Date(filterTo+'T23:59:59'))return false;
@@ -400,52 +1028,62 @@ function filteredCards(){
 }
 
 function renderCards(){
-  M().innerHTML='<div id="toolbarHost"></div>';
-  if(!gridEl){gridEl=document.createElement('div');gridEl.id='grid';gridEl.className='grid';}
-  if(!emptyEl){emptyEl=document.createElement('p');emptyEl.id='empty';emptyEl.className='sub hidden';emptyEl.style.cssText='text-align:center;padding:40px';emptyEl.textContent='无符合条件的卡片';}
-  M().appendChild(gridEl);M().appendChild(emptyEl);
+  M().innerHTML='<div id="toolbarHost"></div><div id="batchHost"></div><div id="cardsBody"></div>';
+  gridEl=null;emptyEl=null;cardEls=Object.create(null);
   renderToolbar();drawGrid();updateSel();
 }
 function renderToolbar(){
-  const cur={q:(dG('search')||{}).value||'',c:(dG('fCountry')||{}).value||'',s:(dG('fStatus')||{}).value||'',o:(dG('fSort')||{}).value||''};
+  const cur={q:(dG('search')||{}).value||'',c:(dG('fCountry')||{}).value||'',s:(dG('fStatus')||{}).value||'',op:(dG('fCarrier')||{}).value||'',cat:(dG('fCategory')||{}).value||'',o:(dG('fSort')||{}).value||''};
   const countries=[...new Set(cards.map(c=>c.countryName).filter(Boolean))].sort();
+  const carriers=[...new Set(cards.map(c=>c.carrier).filter(Boolean))].sort();
+  const categories=[...new Set(cards.map(categoryLabel).filter(Boolean))].sort();
   const filters=`
-      <select id="fCountry"><option value="">全部国家</option>${countries.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+      <select id="fCountry"><option value="">全部国家 / 地区</option>${countries.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <select id="fStatus"><option value="">全部状态</option><option value="active">使用中</option><option value="soon">即将到期</option><option value="exp">已过期</option></select>
-      <select id="fSort"><option value="order">默认排序</option><option value="expiry">按到期</option><option value="carrier">按运营商</option></select>`;
+      <select id="fCategory"><option value="">全部用途</option>${categories.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+      <select id="fCarrier"><option value="">全部运营商</option>${carriers.map(c=>`<option>${esc(c)}</option>`).join('')}</select>`;
   document.getElementById('toolbarHost').innerHTML=selectMode?`
     <div class="toolbar">
-      <input id="search" placeholder="搜索运营商/国家/号码">
+      <input id="search" class="searchInput" placeholder="搜索运营商 / 国家 / 号码">
       ${filters}
-      <span style="flex:1"></span>
-      <div class="batchActions">
-        <span id="selCount" class="sub"></span>
-        <button class="sec" id="tagBtn">批量打标签</button>
-        <button class="danger" id="delBtn">批量删除</button>
-        <button class="ghost" id="doneBtn">完成</button>
-      </div>
+      <div class="toolbarActions"><button class="subtle" id="resetBtn">重置</button><button class="ghost" id="doneBtn">取消选择</button></div>
     </div>`:`
     <div class="toolbar">
-      <input id="search" placeholder="搜索运营商/国家/号码">
+      <input id="search" class="searchInput" placeholder="搜索运营商 / 国家 / 号码">
       ${filters}
-      <span style="flex:1"></span>
-      <button class="sec" id="advBtn">筛选${advCount()?(' · '+advCount()):''}</button>
-      <button class="sec" id="selBtn">批量编辑</button>
-      <button id="newBtn">+ 新建卡片</button>
+      <div class="toolbarActions">
+        <button class="subtle" id="resetBtn">重置</button>
+        <button class="sec" id="advBtn">更多筛选${advCount()?(' · '+advCount()):''}</button>
+        <div class="viewToggle" aria-label="视图切换"><button id="cardViewBtn" class="${cardViewMode==='cards'?'on':''}">卡片</button><button id="listViewBtn" class="${cardViewMode==='list'?'on':''}">列表</button></div>
+        <button class="sec" id="selBtn">批量编辑</button>
+        <button id="newBtn">+ 新建卡片</button>
+      </div>
     </div>${advOpen?advPanelHTML():''}`;
-  if(dG('search')){dG('search').value=cur.q;dG('fCountry').value=cur.c;dG('fStatus').value=cur.s;dG('fSort').value=cur.o;}
-  ['search','fCountry','fStatus','fSort'].forEach(id=>dG(id).addEventListener('input',drawGrid));
-  if(selectMode){dG('tagBtn').onclick=batchTag;dG('delBtn').onclick=batchDelete;dG('doneBtn').onclick=exitSelect;}
+  if(dG('search')){dG('search').value=cur.q;dG('fCountry').value=cur.c;dG('fStatus').value=cur.s;dG('fCarrier').value=cur.op;dG('fCategory').value=cur.cat;if(dG('fSort'))dG('fSort').value=cur.o||'order';}
+  ['search','fCountry','fStatus','fCategory','fCarrier'].forEach(id=>dG(id).addEventListener('input',drawGrid));
+  if(dG('resetBtn'))dG('resetBtn').onclick=resetCardFilters;
+  if(selectMode){dG('doneBtn').onclick=exitSelect;}
   else{
     dG('selBtn').onclick=enterSelect;dG('newBtn').onclick=()=>openDrawer(null);
+    dG('cardViewBtn').onclick=()=>{cardViewMode='cards';localStorage.setItem('simhub_card_view','cards');renderToolbar();drawGrid();};
+    dG('listViewBtn').onclick=()=>{cardViewMode='list';localStorage.setItem('simhub_card_view','list');renderToolbar();drawGrid();};
     dG('advBtn').onclick=()=>{advOpen=!advOpen;renderToolbar();};
     if(advOpen){
       document.querySelectorAll('#tagChips .chip').forEach(el=>el.onclick=()=>{const t=el.dataset.tag;if(filterTags.has(t))filterTags.delete(t);else filterTags.add(t);renderToolbar();drawGrid();});
       dG('fFrom').onchange=e=>{filterFrom=e.target.value;drawGrid();};
       dG('fTo').onchange=e=>{filterTo=e.target.value;drawGrid();};
+      dG('fSort').onchange=drawGrid;
       dG('advClear').onclick=()=>{filterTags.clear();filterFrom='';filterTo='';renderToolbar();drawGrid();};
     }
   }
+}
+function resetCardFilters(){
+  if(dG('search'))dG('search').value='';
+  if(dG('fCountry'))dG('fCountry').value='';
+  if(dG('fStatus'))dG('fStatus').value='';
+  if(dG('fCarrier'))dG('fCarrier').value='';
+  if(dG('fCategory'))dG('fCategory').value='';
+  filterTags.clear();filterFrom='';filterTo='';advOpen=false;renderToolbar();drawGrid();
 }
 function advCount(){return filterTags.size+(filterFrom?1:0)+(filterTo?1:0);}
 function advPanelHTML(){
@@ -454,27 +1092,55 @@ function advPanelHTML(){
     <div style="font-size:13px;color:var(--sub)">按标签（满足任一）</div>
     <div class="tagcloud" id="tagChips" style="margin-top:8px">${allTags.map(t=>`<span class="chip ${filterTags.has(t)?'on':''}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')||'<span class="sub">暂无标签</span>'}</div>
     <div class="row2">
-      <label style="font-size:13px;color:var(--sub);display:flex;align-items:center;gap:8px">到期从 <input type="date" id="fFrom" value="${filterFrom}" style="max-width:170px"></label>
-      <label style="font-size:13px;color:var(--sub);display:flex;align-items:center;gap:8px">到 <input type="date" id="fTo" value="${filterTo}" style="max-width:170px"></label>
+      <label style="font-size:13px;color:var(--sub);display:flex;align-items:center;gap:8px">到期从 ${dateInput('fFrom',filterFrom,'选择日期','max-width:170px')}</label>
+      <label style="font-size:13px;color:var(--sub);display:flex;align-items:center;gap:8px">到 ${dateInput('fTo',filterTo,'选择日期','max-width:170px')}</label>
+      <label style="font-size:13px;color:var(--sub);display:flex;align-items:center;gap:8px">排序 <select id="fSort" style="max-width:150px"><option value="order">默认排序</option><option value="expiry">按到期</option><option value="carrier">按运营商</option></select></label>
       <button class="ghost" id="advClear">清除筛选</button>
     </div>
   </div>`;
 }
-function enterSelect(){selectMode=true;selected.clear();renderToolbar();const g=dG('grid');if(g)g.classList.add('selecting');document.querySelectorAll('.card.sel').forEach(el=>el.classList.remove('sel'));updateSel();}
-function exitSelect(){selectMode=false;selected.clear();renderToolbar();const g=dG('grid');if(g)g.classList.remove('selecting');document.querySelectorAll('.card.sel').forEach(el=>{el.classList.remove('sel');const c=el.querySelector('.selcheck');if(c)c.textContent='';});updateSel();}
+function enterSelect(){selectMode=true;selected.clear();renderToolbar();drawGrid();updateSel();}
+function exitSelect(){selectMode=false;selected.clear();renderToolbar();drawGrid();updateSel();}
 function drawGrid(){
-  const list=filteredCards();const grid=gridEl||document.getElementById('grid');if(!grid)return;
-  grid.classList.toggle('selecting',selectMode);
-  const keep={};list.forEach(c=>keep[c.id]=1);
-  Object.keys(cardEls).forEach(id=>{if(!keep[id]){if(cardEls[id].parentNode)cardEls[id].remove();delete cardEls[id];}});
-  list.forEach((c,idx)=>{const el=ensureCardEl(c);updateCardEl(el,c);if(grid.children[idx]!==el)grid.insertBefore(el,grid.children[idx]||null);});
-  (emptyEl||document.getElementById('empty')).classList.toggle('hidden',list.length>0);
+  const list=filteredCards();const body=dG('cardsBody');if(!body)return;
+  updateBatchBar();
+  if(!list.length){body.innerHTML=emptyState('没有符合条件的卡片','调整搜索或筛选条件，或者新建一张卡片开始管理。','新建卡片','emptyNewCard');const btn=dG('emptyNewCard');if(btn)btn.onclick=()=>openDrawer(null);return;}
+  if(cardViewMode==='list'){body.innerHTML=cardListHTML(list);bindCardList();return;}
+  body.innerHTML='<div id="grid" class="grid"></div>';gridEl=dG('grid');cardEls=Object.create(null);
+  gridEl.classList.toggle('selecting',selectMode);
+  list.forEach(c=>{const el=ensureCardEl(c);updateCardEl(el,c);gridEl.appendChild(el);});
+}
+function cardListHTML(list){
+  const selectHead=selectMode?'<th style="width:44px"></th>':'';
+  return `<div class="cardList"><table><thead><tr>
+    ${selectHead}<th>国家 / 地区</th><th>卡片名称 / 编号</th><th>用途</th><th>运营商</th><th>状态</th><th>到期时间</th><th>最近修改</th><th style="width:58px">操作</th>
+  </tr></thead><tbody>${list.map(c=>`<tr data-row-id="${esc(c.id)}" class="${selectMode&&selected.has(c.id)?'sel':''}">
+    ${selectMode?`<td><input type="checkbox" class="rowCheck" ${selected.has(c.id)?'checked':''} aria-label="选择 ${esc(cardName(c))}"></td>`:''}
+    <td><div class="tableName"><span class="tableFlag">${esc(c.flag||'🌐')}</span><div><div class="tableTitle">${esc(cardCountry(c))}</div><div class="tableSub">${esc(c.countryCode||'')}</div></div></div></td>
+    <td><div class="tableTitle">${esc(cardName(c))}</div><div class="tableSub">${esc(maskDefault&&!revealed.has(c.id)?maskPhone(c.phoneNumber):c.phoneNumber||'无号码')}</div></td>
+    <td>${categoryChip(c)}</td>
+    <td>${esc(c.carrier||'未设置')}</td>
+    <td>${statusBadge(c)}</td>
+    <td>${esc(fmtDate(c.expiryDate))}</td>
+    <td>${c.updatedAt?esc(new Date(c.updatedAt).toLocaleString()):'未记录'}</td>
+    <td><button class="iconbtn rowMore" aria-label="查看详情">⋯</button></td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+function bindCardList(){
+  dG('cardsBody').querySelectorAll('tr[data-row-id]').forEach(row=>{
+    row.onclick=e=>{const id=row.dataset.rowId;if(e.target.closest('.rowCheck')){if(!selectMode){selectMode=true;selected.clear();selected.add(id);renderToolbar();drawGrid();updateSel();return;}toggleSel(id);return;}if(e.target.closest('.rowMore')){openDetailById(id);return;}selectMode?toggleSel(id):openDetailById(id);};
+  });
+}
+function updateBatchBar(){
+  const host=dG('batchHost');if(!host)return;
+  host.innerHTML=selectMode?`<div class="batchBar"><span id="selCount"></span><span class="spacer"></span><button class="sec mini" id="tagBtn" disabled>批量打标签</button><button class="danger mini" id="delBtn" disabled>批量删除</button></div>`:'';
+  if(selectMode){dG('tagBtn').onclick=batchTag;dG('delBtn').onclick=batchDelete;}
 }
 
 /* 批量 */
 
-function toggleSel(id){if(selected.has(id))selected.delete(id);else selected.add(id);const el=document.querySelector(`.card[data-id="${id}"]`);if(el){el.classList.toggle('sel',selected.has(id));const ck=el.querySelector('.selcheck');if(ck)ck.textContent=selected.has(id)?'✓':'';}updateSel();}
-function updateSel(){const el=document.getElementById('selCount');if(el)el.textContent='已选 '+selected.size;}
+function toggleSel(id){if(selected.has(id))selected.delete(id);else selected.add(id);const on=selected.has(id);const el=document.querySelector(`.card[data-id="${id}"]`);if(el){el.classList.toggle('sel',on);const ck=el.querySelector('.selcheck');if(ck)ck.textContent=on?'✓':'';}const row=document.querySelector(`tr[data-row-id="${id}"]`);if(row){row.classList.toggle('sel',on);const ck=row.querySelector('.rowCheck');if(ck)ck.checked=on;}updateSel();}
+function updateSel(){const el=document.getElementById('selCount');if(el)el.textContent='已选择 '+selected.size+' 张';['tagBtn','delBtn'].forEach(id=>{const b=dG(id);if(b)b.disabled=!selected.size;});}
 function batchDelete(){if(!selected.size)return toast('未选择');
   confirmDelete('确定删除选中的 '+selected.size+' 张卡片?此操作无法撤销。',async()=>{
     try{const r=await api('/api/cards/batch-update',{method:'POST',body:JSON.stringify({ids:[...selected],action:'delete'})});toast('已删除 '+r.deleted+' 张');selected.clear();await loadCards();renderCards();}catch(e){toast(e.message);}
@@ -486,9 +1152,10 @@ async function batchTag(){if(!selected.size)return toast('未选择');const t=pr
 /* 导入导出 */
 function renderIO(){
   M().innerHTML=`
-    <div class="panel"><h3>导出</h3><p class="sub" style="margin-top:0">导出全部卡片为 JSON 文件。</p><button id="expBtn">导出 JSON</button></div>
-    <div class="panel"><h3>导入</h3><p class="sub" style="margin-top:0">导入前会先预览,去重后写入,不覆盖整个数据库。</p>
-      <div class="drop" id="drop">拖拽 JSON 文件到此,或<label style="color:var(--accent);cursor:pointer"> 选择文件<input id="file" type="file" accept=".json,application/json" class="hidden"></label></div>
+    <div class="panel"><div class="sectionHead"><div><h3>导出 JSON</h3><p class="sub" style="margin:4px 0 0">导出全部卡片数据为 JSON 文件，可用于备份或迁移。</p></div><button id="expBtn">导出 JSON</button></div></div>
+    <div class="panel"><h3>导入 JSON</h3><p class="sub" style="margin-top:0">导入前会先预览，确认后再写入，不会直接覆盖整个数据库。</p>
+      <div class="drop" id="drop">${icon('upload')}<strong>拖拽 JSON 文件到此处，或选择文件</strong><small>支持 SIMHUB 导出的 JSON；导入时会去重并生成预览。</small><label style="color:var(--accent);cursor:pointer;font-weight:800">选择文件<input id="file" type="file" accept=".json,application/json" class="hidden"></label></div>
+      <div id="impError"></div>
       <div id="impPreview"></div></div>`;
   document.getElementById('expBtn').onclick=doExport;
   const drop=document.getElementById('drop');const file=document.getElementById('file');
@@ -503,13 +1170,34 @@ async function doExport(){
 }
 let importCards=null;
 function readImport(f){
+  const err=dG('impError');if(err)err.innerHTML='';
+  if(!f.name.toLowerCase().endsWith('.json')&&f.type!=='application/json'){if(err)err.innerHTML='<div class="importError">文件类型错误，请选择 JSON 文件。</div>';return;}
+  if(f.size>MAX_IMPORT_BYTES){if(err)err.innerHTML='<div class="importError">文件过大，单次导入请控制在 8MB 以内。</div>';return;}
   const r=new FileReader();r.onload=async()=>{
-    let arr;try{arr=JSON.parse(r.result);if(!Array.isArray(arr))throw 0;}catch(e){return toast('文件格式不正确');}
+    let arr;try{arr=JSON.parse(r.result);if(!Array.isArray(arr))throw 0;}catch(e){if(err)err.innerHTML='<div class="importError">JSON 格式错误，请检查文件内容。</div>';return;}
+    if(arr.length>1000){if(err)err.innerHTML='<div class="importError">一次最多导入 1000 张卡片，请拆分文件后再导入。</div>';return;}
     try{const p=await api('/api/import',{method:'POST',body:JSON.stringify({mode:'preview',cards:arr})});importCards=arr;
-      document.getElementById('impPreview').innerHTML=`<p style="margin-top:14px">预览:共 <b>${p.count}</b> 张卡片。<button id="commitBtn" style="margin-left:10px">确认导入</button></p>`;
+      document.getElementById('impPreview').innerHTML=importPreviewHTML(p);
       document.getElementById('commitBtn').onclick=commitImport;
-    }catch(e){toast(e.message||'解析失败');}
+    }catch(e){if(err)err.innerHTML=`<div class="importError">${esc(e.message||'解析失败')}</div>`;}
   };r.readAsText(f);
+}
+function importPreviewHTML(p){
+  const s=p.summary||{}, d=s.duplicates||{}, dupTotal=Object.values(d).reduce((a,b)=>a+(+b||0),0);
+  const fields=p.fields||{}, rows=p.rows||[];
+  const reason={ready:'可导入',missingCarrier:'缺运营商',id:'ID 重复',phoneNumber:'号码重复',eid:'EID 重复',activation:'激活码重复'};
+  return `<div class="previewBox" style="display:block">
+    <div class="sectionHead"><div><b>iOS / SIMHUB JSON 导入预览</b><div class="sub" style="margin-top:3px">共识别 ${p.count||0} 张卡片；确认后仅写入可导入项目，不会覆盖现有数据库。</div></div><button id="commitBtn" ${s.ready?'' :'disabled'}>确认导入 ${s.ready||0} 张</button></div>
+    <div class="previewGrid">
+      <div class="previewStat"><b>${s.ready||0}</b><span>可导入</span></div>
+      <div class="previewStat"><b>${dupTotal}</b><span>重复风险</span></div>
+      <div class="previewStat"><b>${s.withLPA||0}</b><span>含 LPA 激活信息</span></div>
+      <div class="previewStat"><b>${s.withMoney||0}</b><span>含金额 / 余额</span></div>
+    </div>
+    <div class="previewFields">${(fields.recognized||[]).slice(0,36).map(f=>`<span class="fieldChip">${esc(f)}</span>`).join('')||'<span class="sub">未识别到兼容字段</span>'}</div>
+    ${(fields.unknown||[]).length?`<div class="importError" style="margin-top:12px">发现未知字段：${fields.unknown.slice(0,10).map(esc).join('、')}${fields.unknown.length>10?' 等':''}。导入时会保留兼容字段，未知字段会被忽略。</div>`:''}
+    <div class="previewRows">${rows.map(r=>`<div class="previewRow"><div><b>${esc(r.flag||'🌐')} ${esc(r.carrier||'未命名')}</b><br><span>${esc([r.country,r.plan,r.hasLPA?'LPA':null].filter(Boolean).join(' · ')||'—')}</span></div><span class="statusBadge ${r.status==='ready'?'ok':'warn'}">${esc(reason[r.status]||r.status)}</span></div>`).join('')||'<div class="previewRow"><span class="sub">没有可预览的卡片</span></div>'}</div>
+  </div>`;
 }
 async function commitImport(){
   try{const r=await api('/api/import',{method:'POST',body:JSON.stringify({mode:'commit',cards:importCards})});
@@ -522,20 +1210,38 @@ function renderSettings(){
   if(settingsPage==='email')return renderSettingsEmail();
   if(settingsPage==='backup')return renderSettingsBackup();
   if(settingsPage==='telegram')return renderSettingsTelegram();
+  if(settingsPage==='reminders')return renderSettingsReminders();
+  if(settingsPage==='webhook')return renderSettingsWebhook();
+  if(settingsPage==='api')return renderSettingsAPI();
   const dark=document.body.classList.contains('dark');
   M().innerHTML=`
+    <div class="settingsGroupTitle">账户与安全</div>
     <div class="setlist">
-      <div class="setRow" data-go="security"><div class="rt"><b>账户安全</b><span>修改登录密码</span></div><span class="chev">›</span></div>
-      <div class="setRow" data-go="email"><div class="rt"><b>邮件 / 邮箱验证</b><span>登录两步验证与卡片到期提醒</span></div><span class="chev">›</span></div>
-      <div class="setRow" data-go="telegram"><div class="rt"><b>Telegram 通知</b><span>机器人推送、查卡、可作登录验证</span></div><span class="chev">›</span></div>
-      <div class="setRow" data-go="backup"><div class="rt"><b>数据备份</b><span>导出 JSON 备份 / 卷备份说明</span></div><span class="chev">›</span></div>
+      <div class="setRow" data-go="security"><div class="setIcon">${icon('check')}</div><div class="rt"><b>账户安全</b><span>修改登录用户名与密码</span></div><span class="chev">›</span></div>
     </div>
+    <div class="settingsGroupTitle">验证与通知</div>
     <div class="setlist">
-      <label class="setRow"><div class="rt"><b>默认隐藏电话号码</b><span>卡片号码默认打码，点眼睛单独显示</span></div><input type="checkbox" id="maskChk" ${maskDefault?'checked':''}></label>
-      <label class="setRow"><div class="rt"><b>深色模式</b></div><input type="checkbox" id="darkChk" ${dark?'checked':''}></label>
+      <div class="setRow" data-go="email"><div class="setIcon">${icon('upload')}</div><div class="rt"><b>邮件 / 邮箱验证</b><span>登录两步验证与卡片到期提醒</span></div><span class="chev">›</span></div>
+      <div class="setRow" data-go="telegram"><div class="setIcon">${icon('pulse')}</div><div class="rt"><b>Telegram 通知</b><span>机器人推送、查卡、可作登录验证</span></div><span class="chev">›</span></div>
+      <div class="setRow" data-go="webhook"><div class="setIcon">${icon('list')}</div><div class="rt"><b>Webhook 通知</b><span>推送提醒到自订接口或自动化平台</span></div><span class="chev">›</span></div>
     </div>
+    <div class="settingsGroupTitle">提醒与状态</div>
     <div class="setlist">
-      <div class="setRow danger" id="dcBtn"><div class="rt"><b>退出登录</b><span>退出后需重新输入密码登录</span></div></div>
+      <div class="setRow" data-go="reminders"><div class="setIcon">${icon('alert')}</div><div class="rt"><b>提醒状态</b><span>后台扫描、渠道就绪、最近发送摘要</span></div><span class="chev">›</span></div>
+    </div>
+    <div class="settingsGroupTitle">数据管理</div>
+    <div class="setlist">
+      <div class="setRow" data-go="backup"><div class="setIcon">${icon('cards')}</div><div class="rt"><b>数据备份</b><span>导出 JSON 备份 / 卷备份说明</span></div><span class="chev">›</span></div>
+      <div class="setRow" data-go="api"><div class="setIcon">${icon('list')}</div><div class="rt"><b>API 文档</b><span>卡片、导入导出、提醒接口说明</span></div><span class="chev">›</span></div>
+    </div>
+    <div class="settingsGroupTitle">显示与隐私</div>
+    <div class="setlist">
+      <label class="setRow"><div class="setIcon">${icon('check')}</div><div class="rt"><b>默认隐藏电话号码</b><span>卡片号码默认打码，点眼睛单独显示</span></div><input type="checkbox" id="maskChk" ${maskDefault?'checked':''}></label>
+      <label class="setRow"><div class="setIcon">${icon('pulse')}</div><div class="rt"><b>深色模式</b><span>切换深色后台外观</span></div><input type="checkbox" id="darkChk" ${dark?'checked':''}></label>
+    </div>
+    <div class="settingsGroupTitle">会话</div>
+    <div class="setlist">
+      <div class="setRow danger" id="dcBtn"><div class="setIcon">${icon('alert')}</div><div class="rt"><b>退出登录</b><span>退出后需重新输入密码登录</span></div></div>
     </div>`;
   M().querySelectorAll('.setRow[data-go]').forEach(el=>el.onclick=()=>{settingsPage=el.dataset.go;render();});
   dG('maskChk').onchange=e=>{maskDefault=e.target.checked;localStorage.setItem('simhub_mask',maskDefault?'on':'off');revealed.clear();};
@@ -545,9 +1251,32 @@ function renderSettings(){
 function settingsHeader(title){return `<div class="subhead"><button class="iconbtn" id="backBtn" aria-label="返回"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg></button><h2>${title}</h2></div>`;}
 function renderSettingsSecurity(){
   M().innerHTML=settingsHeader('账户安全')+`
-    <div class="panel"><div class="field"><label>当前密码</label><input id="pwCur" type="password" placeholder="当前登录密码"></div><div class="field"><label>新密码</label><input id="pwNew" type="password" placeholder="至少 8 位"></div><div class="field"><label>确认新密码</label><input id="pwNew2" type="password"></div><button id="pwBtn">修改密码</button></div>`;
+    <div class="securityGrid">
+      <section class="securityCard">
+        <h3>用户名设置</h3>
+        <p class="sub">修改用于登录管理后台的账户名称，保存前需要验证当前密码。</p>
+        <div class="securityFields">
+          <div class="field"><label>当前用户名</label><input id="acctCurrent" autocomplete="username" readonly></div>
+          <div class="field"><label>新用户名</label><input id="acctUser" autocomplete="username" maxlength="32" placeholder="输入新的登录用户名"></div>
+          <div class="field"><label>验证密码</label><input id="acctCur" type="password" autocomplete="current-password" placeholder="当前登录密码"></div>
+        </div>
+        <div class="securityActions"><button id="acctBtn">保存用户名</button></div>
+      </section>
+      <section class="securityCard">
+        <h3>修改密码</h3>
+        <p class="sub">更新登录密码后，下次登录需要使用新密码。</p>
+        <div class="securityFields">
+          <div class="field"><label>验证当前密码</label><input id="pwCur" type="password" autocomplete="current-password" placeholder="当前登录密码"></div>
+          <div class="field"><label>新密码</label><input id="pwNew" type="password" autocomplete="new-password" placeholder="至少 8 位"></div>
+          <div class="field"><label>确认新密码</label><input id="pwNew2" type="password" autocomplete="new-password" placeholder="再次输入新密码"></div>
+        </div>
+        <div class="securityActions"><button id="pwBtn">更新密码</button></div>
+      </section>
+    </div>`;
   dG('backBtn').onclick=()=>{settingsPage='home';render();};
+  dG('acctBtn').onclick=saveSecurityAccount;
   dG('pwBtn').onclick=changePassword;
+  loadSecurityAccount();
 }
 function renderSettingsEmail(){
   M().innerHTML=settingsHeader('邮件 / 邮箱验证')+`
@@ -579,6 +1308,101 @@ function renderSettingsTelegram(){
   dG('tgTest').onclick=testTg;
   loadTg();
 }
+function renderSettingsReminders(){
+  M().innerHTML=settingsHeader('提醒状态')+`
+    <div class="panel" id="reminderStatus"><span class="sub">加载中…</span></div>`;
+  dG('backBtn').onclick=()=>{settingsPage='home';render();};
+  loadReminderStatus();
+}
+function channelStatus(label,c){
+  const state=c&&c.enabled?(c.ready?'已就绪':'未就绪'):'未启用';
+  const days=c&&c.daysBefore!=null?`提前 ${c.daysBefore} 天`:'';
+  return detailRow(label,`${state}${days?' · '+days:''}`);
+}
+async function loadReminderStatus(){
+  const host=dG('reminderStatus');if(!host)return;
+  try{const s=await api('/api/reminders/status');
+    host.innerHTML=`
+      <h3>后台扫描</h3>
+      ${detailRow('扫描方式',s.noPageRequired?'独立 worker':'网页触发')}
+      ${detailRow('扫描间隔',s.scanIntervalSeconds?Math.round(s.scanIntervalSeconds/60)+' 分钟':'')}
+      ${detailRow('最近扫描',s.lastScanAt?fmtTime(s.lastScanAt):'还没有记录')}
+      ${detailRow('最近结果',`扫描 ${s.scanned||0} · 匹配 ${s.matched||0} · 发送 ${s.sent||0} · 失败 ${s.failed||0}`)}
+      <h3 style="margin-top:18px">通知渠道</h3>
+      ${channelStatus('邮件',s.channels&&s.channels.email)}
+      ${channelStatus('Telegram',s.channels&&s.channels.telegram)}
+      ${channelStatus('Webhook',s.channels&&s.channels.webhook)}
+      <div class="drawerActions" style="margin-top:16px"><button class="sec" id="remRefresh">刷新</button><button id="remScan">立即扫描一次</button></div>
+      <div class="sectionHead" style="margin-top:18px"><h3>提醒历史</h3><button class="sec mini" id="remHistoryClear">清除</button></div>
+      ${reminderHistoryHTML(s.history||[])}`;
+    dG('remRefresh').onclick=loadReminderStatus;
+    dG('remScan').onclick=runReminderScan;
+    dG('remHistoryClear').onclick=clearReminderHistory;
+  }catch(e){host.innerHTML='<span class="sub">加载失败</span>';}
+}
+function reminderEventLabel(t){return t==='operation'?'操作提醒':(t==='test'?'测试':'到期提醒');}
+function reminderChannelLabel(c){return c==='email'?'邮件':(c==='telegram'?'Telegram':(c==='webhook'?'Webhook':c));}
+function reminderHistoryHTML(items){
+  if(!items.length)return '<span class="sub">暂无提醒记录</span>';
+  return `<div class="acts">${items.map(x=>{
+    const ok=x.status==='success';
+    const meta=[reminderEventLabel(x.eventType),reminderChannelLabel(x.channel),ok?'成功':'失败',fmtTime(x.createdAt)].filter(Boolean).join(' · ');
+    return `<div class="act"><div class="ai ${ok?'create':'delete'}">${ok?'✓':'!'}</div><div class="at"><b>${esc(x.cardLabel||'—')}</b> <span class="as">${esc(meta)}</span>${x.error?`<div class="as">${esc(x.error)}</div>`:''}</div></div>`;
+  }).join('')}</div>`;
+}
+async function runReminderScan(){
+  if(!confirm('立即扫描会真实发送当前匹配的提醒，继续吗?'))return;
+  const btn=dG('remScan');if(btn){btn.disabled=true;btn.textContent='扫描中…';}
+  try{const r=await api('/api/reminders/scan',{method:'POST',timeoutMs:60000});const s=r.stats||{};toast(`扫描完成：匹配 ${s.matched||0}，发送 ${s.sent||0}，失败 ${s.failed||0}`);loadReminderStatus();}
+  catch(e){toast(e.message||'扫描失败');if(btn){btn.disabled=false;btn.textContent='立即扫描一次';}}
+}
+async function clearReminderHistory(){
+  if(!confirm('确定清除提醒历史记录吗?'))return;
+  const btn=dG('remHistoryClear');if(btn){btn.disabled=true;btn.textContent='清除中…';}
+  try{await api('/api/reminders/history',{method:'DELETE'});toast('已清除提醒历史');loadReminderStatus();}
+  catch(e){toast(e.message||'清除失败');}
+  finally{if(btn){btn.disabled=false;btn.textContent='清除';}}
+}
+function renderSettingsWebhook(){
+  M().innerHTML=settingsHeader('Webhook 通知')+`
+    <div class="panel">
+      <div class="field"><label class="ltrow"><span>启用 Webhook</span><input type="checkbox" id="whEnabled"></label></div>
+      <div class="field"><label>URL</label><input id="whUrl" placeholder="https://example.com/webhook"></div>
+      <div class="field"><label>Method</label><select id="whMethod"><option>POST</option><option>PUT</option><option>PATCH</option></select></div>
+      <div class="field"><label>到期提醒提前天数</label><input id="whDays" style="max-width:96px" inputmode="numeric" value="3"></div>
+      <div class="field"><label>Headers JSON</label><textarea id="whHeaders" rows="4" placeholder='{"Authorization":"Bearer token"}'></textarea></div>
+      <div class="field"><label>Payload 模板</label><textarea id="whPayload" rows="10"></textarea></div>
+      <div class="drawerActions"><button id="whSave" style="flex:1">保存</button><button class="sec" id="whTest">发送测试</button></div>
+    </div>
+    <div class="panel"><h3>可用占位符</h3><div class="codeblk">{{event_type}} {{event_label}} {{card_name}} {{country}} {{plan}}
+{{expiry_date}} {{days_left}} {{phone_number}}
+{{operation_date}} {{operation_note}} {{message}}</div></div>`;
+  dG('backBtn').onclick=()=>{settingsPage='home';render();};
+  dG('whSave').onclick=saveWebhook;
+  dG('whTest').onclick=testWebhook;
+  loadWebhook();
+}
+function renderSettingsAPI(){
+  M().innerHTML=settingsHeader('API 文档')+`
+    <div class="panel"><p class="sub" style="margin-top:0">当前文档描述已登录会话可用的 SIMHUB Web API。写操作需要 <code>X-CSRF-Token</code>，前端会自动带上。</p><div id="apiDocs"><span class="sub">加载中…</span></div></div>`;
+  dG('backBtn').onclick=()=>{settingsPage='home';render();};
+  loadAPIDocs();
+}
+async function loadAPIDocs(){
+  const host=dG('apiDocs');if(!host)return;
+  try{const docs=await api('/api/docs');
+    host.innerHTML=(docs.resources||[]).map(r=>`<div class="apiBlock"><h3>${esc(r.name)}</h3>${(r.endpoints||[]).map(e=>`<div class="apiRow"><span class="apiMethod">${esc(e.method)}</span><code>${esc(e.path)}</code><span>${esc(e.description||'')}</span></div>`).join('')}${r.fields?`<details><summary>字段列表</summary><div class="previewFields">${r.fields.map(f=>`<span class="fieldChip">${esc(f)}</span>`).join('')}</div></details>`:''}</div>`).join('');
+  }catch(e){host.innerHTML='<span class="sub">API 文档加载失败</span>';}
+}
+async function loadWebhook(){
+  try{const a=await api('/api/webhook');
+    dG('whEnabled').checked=a.enabled;dG('whUrl').value=a.url||'';dG('whMethod').value=a.method||'POST';
+    dG('whDays').value=(a.daysBefore==null?3:a.daysBefore);dG('whHeaders').value=a.headers||'';dG('whPayload').value=a.payload||'';
+  }catch(e){}
+}
+function webhookBody(){return{enabled:dG('whEnabled').checked,url:dG('whUrl').value.trim(),method:dG('whMethod').value,headers:dG('whHeaders').value,payload:dG('whPayload').value,daysBefore:nonnegativeIntInput('whDays',3,'提前提醒天数')};}
+async function saveWebhook(){try{await api('/api/webhook',{method:'POST',body:JSON.stringify(webhookBody())});toast('已保存');loadWebhook();}catch(e){toast(e.message||'保存失败');}}
+async function testWebhook(){try{await api('/api/webhook',{method:'POST',body:JSON.stringify(webhookBody())});await api('/api/webhook/test',{method:'POST'});toast('Webhook 测试已发送');loadWebhook();}catch(e){toast(e.message||'发送失败');}}
 async function loadTg(){
   try{const a=await api('/api/tg');
     dG('tgEnabled').checked=a.enabled;dG('tgChat').value=a.chatId||'';
@@ -632,27 +1456,46 @@ async function testSmtp(){
   try{await api('/api/smtp',{method:'POST',body:JSON.stringify(smtpBody())});const r=await api('/api/smtp/test',{method:'POST'});toast('测试邮件已发送到 '+r.to);loadAccount();}
   catch(e){toast(e.message||'发送失败');}
 }
+async function loadSecurityAccount(){
+  try{const a=await api('/api/account');if(dG('acctCurrent'))dG('acctCurrent').value=a.username||'';if(dG('acctUser'))dG('acctUser').value='';}
+  catch(e){}
+}
+async function saveSecurityAccount(){
+  const btn=dG('acctBtn'), user=dG('acctUser').value.trim(), cur=dG('acctCur').value;
+  if(!user)return toast('请输入新用户名');
+  if(!cur)return toast('请输入验证密码');
+  btn.disabled=true;btn.textContent='保存中…';
+  try{const r=await api('/api/account',{method:'POST',body:JSON.stringify({username:user,current:cur})});dG('acctCurrent').value=r.username||user;dG('acctUser').value='';dG('acctCur').value='';toast('用户名已更新');}
+  catch(e){toast(e.message||'保存失败');}
+  finally{btn.disabled=false;btn.textContent='保存用户名';}
+}
 async function changePassword(){
+  const btn=dG('pwBtn');
   const cur=dG('pwCur').value, n1=dG('pwNew').value, n2=dG('pwNew2').value;
   if(n1.length<8)return toast('新密码至少 8 位');
   if(n1!==n2)return toast('两次输入的新密码不一致');
+  btn.disabled=true;btn.textContent='更新中…';
   try{await api('/api/password',{method:'POST',body:JSON.stringify({current:cur,new:n1})});toast('密码已更新');dG('pwCur').value=dG('pwNew').value=dG('pwNew2').value='';}
   catch(e){toast(e.message||'修改失败');}
+  finally{btn.disabled=false;btn.textContent='更新密码';}
 }
 /* 编辑抽屉(对齐 App「新增 eSIM」) */
 const DURS=[[7,'7天'],[15,'15天'],[30,'30天'],[70,'70天'],[90,'90天'],[180,'180天'],[365,'1年']];
 let drawerData={};
 const dG=id=>document.getElementById(id);
+function dateInput(id,value,placeholder='选择日期',style=''){return `<input id="${id}" class="dateInput" data-date-picker type="text" inputmode="none" readonly value="${esc(value||'')}" placeholder="${placeholder}"${style?` style="${style}"`:''}>`;}
 
 function openDrawer(card){
-  const isNew=!card;const now=new Date();
+  const isNew=!card||!card.id;const now=new Date();
   const def={flag:'🌐',countryCode:'',countryName:'',currencyCode:'USD',
     activationDate:isoNoMillis(now),expiryDate:isoNoMillis(addDays(now,30)),createdAt:isoNoMillis(now),
     isLongTerm:false,renewDays:30,renewalUnit:'days',renewalIntervalValue:30,tags:[],
+    reminderMode:'default',reminderDaysBefore:null,
+    operationReminderEnabled:false,operationDate:null,operationDaysBeforeExpiry:null,operationNote:'',
     carrierAppName:'',carrierAppIconURLString:'',carrierAppStoreURLString:'',
     cardBackgroundAssetName:'',cardColorHex:'',currentBalance:'',customPrompt:'',confirmationCode:'',
-    websiteURL:'',smdpAddress:'',activationCode:'',eid:'',price:'',plan:'',phoneNumber:'',carrier:''};
-  drawerData=Object.assign({},def,isNew?{}:(card||{}));
+    websiteURL:'',smdpAddress:'',activationCode:'',eid:'',price:'',plan:'',category:'',phoneNumber:'',carrier:''};
+  drawerData=Object.assign({},def,card||{});
   const d=drawerData;
   const f=(id,label,val,ph='')=>`<div class="field"><label>${label}</label><input id="${id}" value="${esc(val||'')}" placeholder="${ph}"></div>`;
   const ta=(id,label,val)=>`<div class="field"><label>${label}</label><textarea id="${id}" rows="3">${esc(val||'')}</textarea></div>`;
@@ -663,6 +1506,7 @@ function openDrawer(card){
       <button class="pickRow" id="appRow"></button></div>
     <div class="secLabel">方案资讯</div>
     ${f('f_plan','套餐',d.plan,'例如：30天不限流量')}
+    <div class="field"><label>用途分类</label><input id="f_category" list="categoryPresets" value="${esc(d.category||'')}" placeholder="主号 / 接码 / 银行绑定 / 流量卡 / 保号"><datalist id="categoryPresets">${CATEGORY_PRESETS.map(x=>`<option value="${esc(x)}"></option>`).join('')}</datalist></div>
     <div class="field"><label>每周期付款 / 币种</label><div class="two">
       <input id="f_price" value="${esc(d.price||'')}" placeholder="12.50">
       <input id="f_currencyCode" value="${esc(d.currencyCode||'USD')}" style="max-width:90px"></div></div>
@@ -675,15 +1519,30 @@ function openDrawer(card){
     ${ta('f_customPrompt','自订提示词',d.customPrompt)}
     ${f('f_tags','标签(逗号分隔)',(d.tags||[]).join(', '),'保号卡, 旅行备用')}
     <div class="secLabel">激活信息</div>
+    <div class="field"><label class="ltrow"><span>本卡不使用 LPA（可选）</span><input type="checkbox" id="f_skipLPA"></label></div>
     ${f('f_smdpAddress','SM-DP+ 地址',d.smdpAddress)}
     ${f('f_activationCode','激活码',d.activationCode)}
     ${f('f_confirmationCode','确认码(选填)',d.confirmationCode)}
+    <div class="field"><label class="ltrow"><span>本卡没有 EID（可选）</span><input type="checkbox" id="f_skipEID"></label></div>
     ${f('f_eid','EID(选填)',d.eid,'32 位 EID')}
     <div class="secLabel">到期时间</div>
-    <div class="field"><label>方案开始日期</label><input id="f_start" type="date" value="${(d.activationDate||'').slice(0,10)}"></div>
+    <div class="field"><label>方案开始日期</label>${dateInput('f_start',(d.activationDate||'').slice(0,10))}</div>
     <div class="field"><label>方案时长(快捷)</label><div class="durs" id="durs">${DURS.map(([n,t])=>`<button type="button" class="dur" data-n="${n}">${t}</button>`).join('')}</div></div>
     <div class="field"><label class="ltrow"><span>长期保号</span><input type="checkbox" id="f_longterm" ${d.isLongTerm?'checked':''}></label></div>
-    <div class="field"><label>精确到期日期</label><input id="f_expiry" type="date" value="${(d.expiryDate||'').slice(0,10)}"></div>
+    <div class="field"><label>精确到期日期</label>${dateInput('f_expiry',(d.expiryDate||'').slice(0,10))}</div>
+    <div class="field"><label>到期特别提醒</label><select id="f_reminderMode">
+      <option value="default" ${(!d.reminderMode||d.reminderMode==='default')?'selected':''}>跟随全局设置</option>
+      <option value="custom" ${d.reminderMode==='custom'?'selected':''}>自定义提前天数</option>
+      <option value="off" ${d.reminderMode==='off'?'selected':''}>这张卡不提醒</option>
+    </select></div>
+    <div class="field" id="reminderDaysField"><label>自定义提前天数</label><input id="f_reminderDaysBefore" inputmode="numeric" value="${d.reminderDaysBefore??3}" style="max-width:120px"></div>
+    <div class="secLabel">操作提醒</div>
+    <div class="field"><label class="ltrow"><span>启用操作提醒</span><input type="checkbox" id="f_operationEnabled" ${d.operationReminderEnabled?'checked':''}></label></div>
+    <div id="operationFields">
+      <div class="field"><label>操作日期</label>${dateInput('f_operationDate',(d.operationDate||'').slice(0,10))}</div>
+      <div class="field"><label>或到期前几天</label><input id="f_operationDaysBeforeExpiry" inputmode="numeric" value="${d.operationDaysBeforeExpiry??1}" style="max-width:120px"></div>
+      ${ta('f_operationNote','操作事项',d.operationNote||'续费 / 充值 / 实名 / 取消套餐')}
+    </div>
     <div id="daySummary" class="summary"></div>
     <div class="drawerActions"><button id="saveBtn" style="flex:1">保存</button>${isNew?'':'<button class="danger" id="delBtn2">删除</button>'}<button class="sec" id="cancelBtn">取消</button></div>
     </div></div>`;
@@ -693,29 +1552,55 @@ function openDrawer(card){
   dG('bgRow').onclick=()=>openBgPicker();
   dG('durs').querySelectorAll('.dur').forEach(b=>b.onclick=()=>{const s=dG('f_start').value||new Date().toISOString().slice(0,10);dG('f_expiry').value=isoNoMillis(addDays(new Date(s),+b.dataset.n)).slice(0,10);updateSummary();});
   dG('f_start').onchange=updateSummary;dG('f_expiry').onchange=updateSummary;
+  dG('f_reminderMode').onchange=updateReminderUI;updateReminderUI();
+  dG('f_operationEnabled').onchange=updateOperationUI;updateOperationUI();
   dG('cancelBtn').onclick=()=>document.getElementById('drawerHost').innerHTML='';
   dG('saveBtn').onclick=()=>save(card,isNew);
+  dG('f_skipLPA').onchange=toggleSkipLPAInputs;
+  dG('f_skipEID').onchange=toggleSkipEIDInput;
+  if(String(d.smdpAddress||'').trim()||String(d.activationCode||'').trim()||String(d.confirmationCode||'').trim())dG('f_skipLPA').checked=false;
+  toggleSkipLPAInputs();
+  toggleSkipEIDInput();
   if(!isNew)dG('delBtn2').onclick=()=>delCard(card);
 }
-function refreshAppRow(){const d=drawerData;dG('appRow').innerHTML=d.carrierAppIconURLString?`<img src="${esc(d.carrierAppIconURLString)}" class="appicon"><span>${esc(d.carrierAppName||'已选图标')}</span><span class="chev">›</span>`:`<span class="ph">从 App Store 选择图标</span><span class="chev">›</span>`;}
+function toggleSkipLPAInputs(){
+  const skip=dG('f_skipLPA')&&dG('f_skipLPA').checked;
+  ['f_smdpAddress','f_activationCode','f_confirmationCode'].forEach(id=>{const el=dG(id);if(el){el.disabled=!!skip;if(skip)el.value='';}});
+}
+function toggleSkipEIDInput(){
+  const skip=dG('f_skipEID')&&dG('f_skipEID').checked;
+  const el=dG('f_eid');if(el){el.disabled=!!skip;if(skip)el.value='';}
+}
+function refreshAppRow(){const d=drawerData,appIcon=safeImgURL(d.carrierAppIconURLString);dG('appRow').innerHTML=appIcon?`<img src="${esc(appIcon)}" class="appicon"><span>${esc(d.carrierAppName||'已选图标')}</span><span class="chev">›</span>`:`<span class="ph">从 App Store 选择图标</span><span class="chev">›</span>`;}
 function refreshCountryRow(){const d=drawerData;dG('countryRow').innerHTML=`<span style="font-size:20px">${esc(d.flag||'🌐')}</span><span>${esc(d.countryName||'选择国家 / 地区')}</span><span class="chev">›</span>`;}
 function refreshBgRow(){const d=drawerData;const bg=bgByAsset[d.cardBackgroundAssetName];dG('bgRow').innerHTML=bg?`<img src="${esc(bg)}" class="appicon" style="object-fit:cover"><span>${esc(d.countryName||'已选背景')}</span><span class="chev">›</span>`:`<span class="ph">默认（无背景图）</span><span class="chev">›</span>`;}
 function updateSummary(){const s=dG('f_start').value,e=dG('f_expiry').value;dG('daySummary').textContent=(s&&e)?`开始 ${s} → 到期 ${e}（${daySpan(new Date(s),new Date(e))} 天）`:'';}
+function updateReminderUI(){const el=dG('reminderDaysField');if(el)el.classList.toggle('hidden',(dG('f_reminderMode')||{}).value!=='custom');}
+function updateOperationUI(){const el=dG('operationFields');if(el)el.classList.toggle('hidden',!dG('f_operationEnabled').checked);}
 
 async function save(orig,isNew){
   const btn=dG('saveBtn');btn.disabled=true;btn.textContent='保存中…';
   const v=id=>(dG(id)?dG(id).value:'');
+  const skipLPA=!!(dG('f_skipLPA')&&dG('f_skipLPA').checked);
+  const skipEID=!!(dG('f_skipEID')&&dG('f_skipEID').checked);
   const start=dateOnlyISO(v('f_start'))||drawerData.activationDate;
   const expiry=dateOnlyISO(v('f_expiry'))||drawerData.expiryDate;
+  const reminderMode=v('f_reminderMode')||'default';
   const p=Object.assign({},drawerData,{
-    carrier:v('f_carrier'),plan:v('f_plan'),price:v('f_price'),currencyCode:v('f_currencyCode')||'USD',
+    carrier:v('f_carrier'),plan:v('f_plan'),category:v('f_category'),price:v('f_price'),currencyCode:v('f_currencyCode')||'USD',
     phoneNumber:v('f_phoneNumber'),websiteURL:v('f_websiteURL'),currentBalance:v('f_currentBalance'),
     transactionNotes:v('f_transactionNotes'),customPrompt:v('f_customPrompt'),
-    smdpAddress:v('f_smdpAddress'),activationCode:v('f_activationCode'),
-    confirmationCode:v('f_confirmationCode'),eid:v('f_eid'),
+    smdpAddress:skipLPA?'':v('f_smdpAddress'),activationCode:skipLPA?'':v('f_activationCode'),
+    confirmationCode:skipLPA?'':v('f_confirmationCode'),eid:skipEID?'':v('f_eid'),
     tags:v('f_tags').split(',').map(s=>s.trim()).filter(Boolean),
     activationDate:start,expiryDate:expiry,
     isLongTerm:dG('f_longterm').checked,
+    reminderMode,
+    reminderDaysBefore:reminderMode==='custom'?v('f_reminderDaysBefore'):null,
+    operationReminderEnabled:dG('f_operationEnabled').checked,
+    operationDate:v('f_operationDate')?dateOnlyISO(v('f_operationDate')):null,
+    operationDaysBeforeExpiry:v('f_operationDaysBeforeExpiry'),
+    operationNote:v('f_operationNote'),
     renewDays:daySpan(new Date(start),new Date(expiry)),
     createdAt:drawerData.createdAt||isoNoMillis(new Date())
   });
@@ -728,8 +1613,141 @@ async function save(orig,isNew){
     if(e.code==='CONFLICT'){if(confirm('App 内这张卡已被修改。重新加载最新数据?')){document.getElementById('drawerHost').innerHTML='';await loadCards();}}
     else toast(e.message||'保存失败');}
 }
+
+let activeDateInput=null;
+let datePickerMonth=null;
+let datePickerMode='grid';
+let wheelScrollTimer=null;
+function parseDateValue(value){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value||'');
+  if(!m)return null;
+  const d=new Date(+m[1],+m[2]-1,+m[3]);
+  return Number.isNaN(d.getTime())?null:d;
+}
+function pad2(n){return String(n).padStart(2,'0');}
+function dateValue(d){return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;}
+function sameDate(a,b){return a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
+function datePickerHost(){
+  let host=document.getElementById('datePickerHost');
+  if(!host){host=document.createElement('div');host.id='datePickerHost';host.className='datePickerHost';document.body.appendChild(host);}
+  return host;
+}
+function openDatePicker(input){
+  activeDateInput=input;
+  const base=parseDateValue(input.value)||new Date();
+  datePickerMonth=new Date(base.getFullYear(),base.getMonth(),1);
+  datePickerMode='grid';
+  renderDatePicker();
+}
+function closeDatePicker(){
+  const host=document.getElementById('datePickerHost');
+  if(host)host.remove();
+  activeDateInput=null;datePickerMonth=null;datePickerMode='grid';
+}
+function placeDatePicker(host){
+  if(!activeDateInput)return;
+  const box=host.firstElementChild, rect=activeDateInput.getBoundingClientRect();
+  const w=box?box.offsetWidth:360, h=box?box.offsetHeight:410, gap=10;
+  const maxLeft=Math.max(12,window.innerWidth-w-12);
+  const left=Math.min(Math.max(12,rect.left),maxLeft);
+  let top=rect.bottom+gap;
+  if(top+h>window.innerHeight-12)top=Math.max(12,rect.top-h-gap);
+  host.style.left=left+'px';host.style.top=top+'px';
+}
+function renderDatePicker(){
+  if(!activeDateInput||!document.body.contains(activeDateInput))return closeDatePicker();
+  if(datePickerMode==='wheel')return renderDateWheel();
+  renderDateGrid();
+}
+function renderDateGrid(){
+  if(!activeDateInput||!document.body.contains(activeDateInput))return closeDatePicker();
+  const host=datePickerHost(), y=datePickerMonth.getFullYear(), m=datePickerMonth.getMonth();
+  const selected=parseDateValue(activeDateInput.value), today=new Date();
+  const first=new Date(y,m,1), offset=first.getDay();
+  const cells=[];
+  for(let i=0;i<42;i++){
+    const d=new Date(y,m,i-offset+1), out=d.getMonth()!==m;
+    const cls=['glassCalDay',out?'out':'',sameDate(d,today)?'today':'',sameDate(d,selected)?'sel':''].filter(Boolean).join(' ');
+    cells.push(`<button type="button" class="${cls}" data-date-value="${dateValue(d)}">${d.getDate()}</button>`);
+  }
+  host.innerHTML=`<div class="glassCal">
+    <div class="glassCalHead"><button type="button" class="glassCalTitle" data-date-action="toggle-wheel">${y}年 ${m+1}月</button><div class="glassCalNav"><button type="button" data-date-action="prev" aria-label="上个月">‹</button><button type="button" data-date-action="next" aria-label="下个月">›</button></div></div>
+    <div class="glassCalWeek">${['日','一','二','三','四','五','六'].map(x=>`<span>${x}</span>`).join('')}</div>
+    <div class="glassCalGrid">${cells.join('')}</div>
+    <div class="glassCalFoot"><button type="button" data-date-action="clear">清空</button><button type="button" data-date-action="today">今天</button></div>
+  </div>`;
+  placeDatePicker(host);
+}
+function renderDateWheel(){
+  if(!activeDateInput||!document.body.contains(activeDateInput))return closeDatePicker();
+  const host=datePickerHost(), y=datePickerMonth.getFullYear(), m=datePickerMonth.getMonth();
+  const years=[];for(let yy=y-80;yy<=y+80;yy++)years.push(yy);
+  const yearItems=years.map(yy=>`<button type="button" class="wheelItem ${yy===y?'sel':''}" data-wheel-type="year" data-wheel-value="${yy}">${yy}年</button>`).join('');
+  const monthItems=Array.from({length:12},(_,i)=>`<button type="button" class="wheelItem ${i===m?'sel':''}" data-wheel-type="month" data-wheel-value="${i}">${i+1}月</button>`).join('');
+  host.innerHTML=`<div class="glassCal wheelMode">
+    <div class="glassCalHead"><button type="button" class="glassCalTitle wheel" data-date-action="toggle-wheel">${y}年 ${m+1}月</button><div class="glassCalNav"><button type="button" data-date-action="wheel-done">完成</button></div></div>
+    <div class="glassCalWheel"><div class="glassCalWheelMark"></div><div class="wheelCol" data-wheel-type="year">${yearItems}</div><div class="wheelCol" data-wheel-type="month">${monthItems}</div></div>
+    <div class="glassCalFoot"><button type="button" data-date-action="clear">清空</button><button type="button" data-date-action="today">今天</button></div>
+  </div>`;
+  placeDatePicker(host);
+  requestAnimationFrame(()=>{host.querySelectorAll('.wheelItem.sel').forEach(el=>el.scrollIntoView({block:'center'}));});
+}
+function setWheelValue(type,value){
+  const nextYear=type==='year'?+value:datePickerMonth.getFullYear();
+  const nextMonth=type==='month'?+value:datePickerMonth.getMonth();
+  if(nextYear===datePickerMonth.getFullYear()&&nextMonth===datePickerMonth.getMonth())return;
+  datePickerMonth=new Date(nextYear,nextMonth,1);
+  renderDateWheel();
+}
+function settleWheelColumn(col){
+  const items=[...col.querySelectorAll('.wheelItem')];
+  const center=col.getBoundingClientRect().top+col.clientHeight/2;
+  let best=items[0], dist=Infinity;
+  items.forEach(el=>{const r=el.getBoundingClientRect();const d=Math.abs((r.top+r.height/2)-center);if(d<dist){dist=d;best=el;}});
+  if(best)setWheelValue(best.dataset.wheelType,best.dataset.wheelValue);
+}
+function setDateInputValue(value){
+  if(!activeDateInput)return;
+  activeDateInput.value=value;
+  activeDateInput.dispatchEvent(new Event('input',{bubbles:true}));
+  activeDateInput.dispatchEvent(new Event('change',{bubbles:true}));
+  activeDateInput.focus();
+}
+document.addEventListener('click',e=>{
+  const input=e.target.closest&&e.target.closest('[data-date-picker]');
+  if(input){e.preventDefault();openDatePicker(input);return;}
+  const cal=e.target.closest&&e.target.closest('.glassCal');
+  if(cal){
+    e.preventDefault();
+    const wheelItem=e.target.closest('[data-wheel-type][data-wheel-value]');
+    const valueBtn=e.target.closest('[data-date-value]');
+    const actionBtn=e.target.closest('[data-date-action]');
+    if(wheelItem){setWheelValue(wheelItem.dataset.wheelType,wheelItem.dataset.wheelValue);return;}
+    if(valueBtn){setDateInputValue(valueBtn.dataset.dateValue);closeDatePicker();return;}
+    if(actionBtn){
+      const action=actionBtn.dataset.dateAction;
+      if(action==='toggle-wheel'){datePickerMode=datePickerMode==='wheel'?'grid':'wheel';renderDatePicker();return;}
+      if(action==='wheel-done'){datePickerMode='grid';renderDatePicker();return;}
+      if(action==='prev'||action==='next'){datePickerMonth=new Date(datePickerMonth.getFullYear(),datePickerMonth.getMonth()+(action==='next'?1:-1),1);renderDatePicker();return;}
+      if(action==='today'){setDateInputValue(dateValue(new Date()));closeDatePicker();return;}
+      if(action==='clear'){setDateInputValue('');closeDatePicker();return;}
+    }
+    return;
+  }
+  if(activeDateInput)closeDatePicker();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&activeDateInput)closeDatePicker();});
+document.addEventListener('scroll',e=>{
+  const col=e.target&&e.target.closest&&e.target.closest('.wheelCol');
+  if(!col||!activeDateInput)return;
+  clearTimeout(wheelScrollTimer);
+  wheelScrollTimer=setTimeout(()=>settleWheelColumn(col),120);
+},true);
+window.addEventListener('resize',()=>{if(activeDateInput)renderDatePicker();});
 function openDetailById(id){const c=cards.find(x=>x.id===id);if(c)openDetail(c);}
 function detailRow(label,val){return (val||val===0)?`<div class="dRow"><span class="dL">${esc(label)}</span><span class="dV">${esc(val)}</span></div>`:'';}
+function reminderText(c){if(c.isLongTerm)return '';if(c.reminderMode==='off')return '关闭';if(c.reminderMode==='custom')return `提前 ${c.reminderDaysBefore??3} 天`;return '跟随全局设置';}
+function operationText(c){if(!c.operationReminderEnabled)return '';const when=c.operationDate?new Date(c.operationDate).toLocaleDateString():(c.operationDaysBeforeExpiry!=null?`到期前 ${c.operationDaysBeforeExpiry} 天`:'');const note=c.operationNote||'';return [when,note].filter(Boolean).join(' · ');}
 function openDetail(card){
   const c=card;const dl=daysLeft(c);
   const start=c.activationDate?new Date(c.activationDate).toLocaleDateString():'';
@@ -743,10 +1761,13 @@ function openDetail(card){
       <div><h2 style="margin:0">${esc(c.carrier||'未命名')}</h2><div class="sub">${esc(c.countryName||'')} ${esc(c.plan||'')}</div></div></div>
     ${detailRow('电话号码',c.phoneNumber)}
     ${detailRow('套餐',c.plan)}
+    ${detailRow('用途分类',categoryLabel(c))}
     ${detailRow('价格',price)}
     ${detailRow('目前余额',c.currentBalance)}
     ${detailRow('开始日期',start)}
     ${detailRow('到期日期',expiry+(leftTxt?`（${leftTxt}）`:''))}
+    ${detailRow('到期提醒',reminderText(c))}
+    ${detailRow('操作提醒',operationText(c))}
     ${detailRow('续期周期',c.renewDays?`${c.renewDays} 天`:'')}
     ${detailRow('SM-DP+ 地址',c.smdpAddress)}
     ${detailRow('激活码',c.activationCode)}
@@ -814,7 +1835,7 @@ async function openAppPicker(){
     <div class="pickerList" id="apList"><p class="sub" style="padding:20px;text-align:center">输入后回车搜索 · 结果来自 Apple iTunes Search API</p></div></div></div>`;
   const run=async()=>{const term=dG('apSearch').value.trim();if(!term)return;dG('apList').innerHTML='<p class="sub" style="padding:20px;text-align:center">搜索中…</p>';
     try{const r=await api('/api/appsearch?term='+encodeURIComponent(term)+'&country='+encodeURIComponent(drawerData.countryCode||'US'))||[];
-      dG('apList').innerHTML=r.length?r.map((a,i)=>`<div class="pkItem" data-i="${i}"><img src="${esc(a.icon)}" class="appicon"><div><div>${esc(a.name)}</div><div class="sub">${esc(a.seller||'')}</div></div></div>`).join(''):'<p class="sub" style="padding:20px;text-align:center">没有找到匹配的 App,换个词或继续用国旗</p>';
+      dG('apList').innerHTML=r.length?r.map((a,i)=>{const appIcon=safeImgURL(a.icon);return `<div class="pkItem" data-i="${i}">${appIcon?`<img src="${esc(appIcon)}" class="appicon">`:'<span class="appicon">🌐</span>'}<div><div>${esc(a.name)}</div><div class="sub">${esc(a.seller||'')}</div></div></div>`;}).join(''):'<p class="sub" style="padding:20px;text-align:center">没有找到匹配的 App,换个词或继续用国旗</p>';
       dG('apList').querySelectorAll('.pkItem').forEach(el=>el.onclick=()=>{const a=r[+el.dataset.i];drawerData.carrierAppName=a.name;drawerData.carrierAppIconURLString=a.icon;drawerData.carrierAppStoreURLString=a.url||'';refreshAppRow();host.innerHTML='';});
     }catch(e){dG('apList').innerHTML='<p class="sub" style="padding:20px;text-align:center">'+esc(e.message||'搜索失败')+'</p>';}};
   dG('apSearch').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
@@ -826,7 +1847,7 @@ let lastVersion=0;
 setInterval(async()=>{
   if(document.getElementById('app').classList.contains('hidden'))return;
   if(document.getElementById('drawerHost').innerHTML)return; // 编辑中不打断,避免手机端卡顿
-  try{const s=await api('/api/status');document.getElementById('deviceMeta').textContent=(s.deviceName||'')+' · '+(s.connectedDevices||0)+' 台在线';
+  try{const s=await api('/api/status');updateKeeperStatus(s);
     if(s.dataVersion&&s.dataVersion!==lastVersion){if(lastVersion!==0)await loadCards();lastVersion=s.dataVersion;}}catch(e){}
 },4000);
 

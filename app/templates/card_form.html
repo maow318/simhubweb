@@ -19,6 +19,10 @@
       <input name="plan" value="{{ card.plan }}" placeholder="例如：30天无限流量 / 保号套餐">
     </label>
     <label>
+      用途分类
+      <input name="category" value="{{ card.category or '' }}" placeholder="主号 / 接码 / 银行绑定 / 流量卡 / 保号">
+    </label>
+    <label>
       手机号
       <input name="phoneNumber" value="{{ card.phoneNumber }}" placeholder="+81 ...">
     </label>

@@ -1,5 +1,10 @@
 # 单域名反代 + 自动 HTTPS。域名由 docker-compose.prod.yml 通过 SIMHUB_DOMAIN 注入。
 {$SIMHUB_DOMAIN} {
 	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+	}
 	reverse_proxy app:8080
 }
