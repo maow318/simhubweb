@@ -48,13 +48,15 @@ cp .env.example .env
 
 python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(48))"
 python3 -c "import secrets; print('DATA_ENCRYPTION_KEY=' + secrets.token_urlsafe(48))"
+python3 -c "import secrets; print('SETUP_TOKEN=' + secrets.token_urlsafe(24))"
 ```
 
-把生成的 `SECRET_KEY`、`DATA_ENCRYPTION_KEY` 写入 `.env`，并把 `SIMHUB_DOMAIN` 改成你的域名：
+把生成的 `SECRET_KEY`、`DATA_ENCRYPTION_KEY`、`SETUP_TOKEN` 写入 `.env`，并把 `SIMHUB_DOMAIN` 改成你的域名：
 
 ```env
 SECRET_KEY=请替换为固定随机值
 DATA_ENCRYPTION_KEY=请替换为另一个固定随机值
+SETUP_TOKEN=首次创建管理员时输入的一次性安装令牌
 SIMHUB_DOMAIN=simhub.example.com
 SESSION_COOKIE_SECURE=1
 ENABLE_HSTS=1
@@ -66,7 +68,7 @@ ENABLE_HSTS=1
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Caddy 会自动申请 HTTPS 证书。首次访问 `https://你的域名` 时会进入管理员创建流程。
+Caddy 会自动申请 HTTPS 证书。首次访问 `https://你的域名` 时会进入管理员创建流程；如果设置了 `SETUP_TOKEN`，页面会要求输入该令牌，避免公开部署时被他人抢先创建管理员。
 
 ### 本地或内网测试
 
@@ -90,6 +92,7 @@ http://服务器IP:8080
 ```env
 SECRET_KEY=change-this-to-a-long-random-string
 DATA_ENCRYPTION_KEY=change-this-to-another-long-random-string
+SETUP_TOKEN=change-this-first-run-token
 DATABASE=/data/simhub.sqlite
 TZ=Asia/Shanghai
 SIMHUB_DOMAIN=simhub.example.com
@@ -101,8 +104,8 @@ REMINDER_SCAN_INTERVAL_SECONDS=3600
 ```env
 SESSION_COOKIE_SECURE=1
 ENABLE_HSTS=1
-# 仅在可信反代覆盖 X-Forwarded-For 时开启
-# TRUST_PROXY=1
+# docker-compose.prod.yml + 本仓库 Caddy 默认开启，用于按真实客户端 IP 登录限流
+TRUST_PROXY=1
 ```
 
 导入限制：
@@ -160,9 +163,11 @@ REMINDER_SCAN_INTERVAL_SECONDS=3600
 - 密码使用 `pbkdf2:sha256` 哈希保存
 - SMTP 授权码、Telegram Token、SM-DP+、激活码、确认码、EID 会加密后入库
 - 写操作 API 需要 `X-CSRF-Token`，并只接受 JSON 请求体
-- 默认登录限流，防止暴力破解
+- 默认登录限流，失败记录持久化在 SQLite，防止暴力破解并避免进程重启后清零
+- CSV 导出会中和 `= + - @` 开头的单元格，降低从不可信备份再导出到 Excel/LibreOffice 时的公式注入风险
 - 支持邮箱或 Telegram 登录二次验证
 - 生产环境建议开启 `SESSION_COOKIE_SECURE=1` 和 `ENABLE_HSTS=1`
+- `TRUST_PROXY=1` 只应在可信反代会覆盖 `X-Forwarded-For` 时开启；本仓库 Caddy 配置会把该头设置为真实客户端 IP
 - 不要把 `.env`、数据库、导出 JSON、备份包提交到 GitHub
 
 `DATA_ENCRYPTION_KEY` 必须长期固定。丢失后，已加密的通知配置和 eSIM 敏感字段无法解密，需要重新填写。

@@ -118,3 +118,11 @@ CREATE TABLE IF NOT EXISTS reminder_attempt_log (
 
 CREATE INDEX IF NOT EXISTS idx_reminder_attempt_log_created ON reminder_attempt_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_reminder_attempt_log_card ON reminder_attempt_log(card_id);
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+    ip TEXT NOT NULL,
+    ts REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_ts ON login_attempts(ip, ts);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ts ON login_attempts(ts);

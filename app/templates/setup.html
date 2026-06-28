@@ -32,6 +32,7 @@ button:active{transform:scale(.98)}
 .flash{font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:13px}
 .flash.error{background:rgba(255,59,48,.14);color:var(--danger)}
 .flash.success{background:rgba(52,199,89,.16);color:var(--ok)}
+.setupWarn{font-size:13px;line-height:1.5;border:1px solid rgba(239,68,68,.22);border-radius:13px;background:rgba(239,68,68,.12);color:var(--danger);padding:11px 12px;margin:0 0 14px}
 </style>
 </head>
 <body>
@@ -39,8 +40,17 @@ button:active{transform:scale(.98)}
   <div class="logo"><img src="/static/app-icon.jpg" alt="esimSubscription"></div>
   <h1>创建管理员</h1>
   <p class="subtitle">首次进入需要创建一个本地管理员账号，密码会加密保存在 SQLite 数据库里。</p>
+  {% if setup_token_recommended %}
+  <div class="setupWarn">生产环境建议先在 .env 设置 SETUP_TOKEN，避免首次公开部署时管理员账号被他人抢先创建。</div>
+  {% endif %}
   <div id="flashHost"></div>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if setup_token_required %}
+  <div class="field">
+    <label>安装令牌</label>
+    <input name="setup_token" type="password" autocomplete="one-time-code" required placeholder="输入 .env 里的 SETUP_TOKEN">
+  </div>
+  {% endif %}
   <div class="field">
     <label>用户名</label>
     <input name="username" value="admin" autocomplete="username" required>

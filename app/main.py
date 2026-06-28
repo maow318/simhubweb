@@ -74,6 +74,7 @@ PLACEHOLDER_SECRET_PREFIXES = (
 )
 ENCRYPTED_PREFIX = "enc:v1:"
 CARD_SECRET_FIELDS = {"smdpAddress", "activationCode", "confirmationCode", "eid"}
+CSV_FORMULA_PREFIXES = ("=", "+", "-", "@")
 MAX_CONTENT_LENGTH = env_int("MAX_CONTENT_LENGTH", 8 * 1024 * 1024)
 MAX_IMPORT_CARDS = env_int("MAX_IMPORT_CARDS", 1000)
 MAX_BACKGROUND_IMAGE_CHARS = env_int("MAX_BACKGROUND_IMAGE_CHARS", 1_500_000)
@@ -303,6 +304,7 @@ def create_app():
     app.config["ENABLE_HSTS"] = env_bool("ENABLE_HSTS", False)
     app.config["SIMHUB_PRODUCTION"] = production
     app.config["PUBLIC_BASE_URL"] = public_base_url_from_env()
+    app.config["SETUP_TOKEN"] = (os.environ.get("SETUP_TOKEN") or "").strip()
     # 仅当部署在可信反代后（由它覆盖 X-Forwarded-For）时才信任转发头取客户端 IP
     app.config["TRUST_PROXY"] = (os.environ.get("TRUST_PROXY", "") or "").lower() in ("1", "true", "yes", "on")
 
@@ -370,7 +372,9 @@ def create_app():
             username = request.form.get("username", "").strip() or "admin"
             password = request.form.get("password", "")
             confirm = request.form.get("confirm", "")
-            if len(password) < 8:
+            if not setup_token_is_valid(request.form.get("setup_token", "")):
+                flash("安装令牌不正确，请检查 SETUP_TOKEN。", "error")
+            elif len(password) < 8:
                 flash("密码至少需要 8 位。", "error")
             elif password != confirm:
                 flash("两次输入的密码不一致。", "error")
@@ -382,7 +386,11 @@ def create_app():
                 get_db().commit()
                 flash("管理员已创建，请登录。", "success")
                 return redirect(url_for("login"))
-        return render_template("setup.html")
+        return render_template(
+            "setup.html",
+            setup_token_required=bool(app.config.get("SETUP_TOKEN")),
+            setup_token_recommended=production_mode_enabled() and not app.config.get("SETUP_TOKEN"),
+        )
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -604,7 +612,7 @@ def create_app():
         writer = csv.writer(buf)
         writer.writerow(fields)
         for card in cards:
-            writer.writerow([", ".join(card[field]) if field == "tags" else card.get(field, "") for field in fields])
+            writer.writerow([csv_export_value(card, field) for field in fields])
         return Response(
             buf.getvalue(),
             mimetype="text/csv",
@@ -1335,8 +1343,11 @@ self.addEventListener('fetch',e=>{
 
     @app.route("/api/telegram/webhook", methods=["POST"])
     def telegram_webhook():
-        # 校验密钥头，拒绝非 Telegram 来源
-        if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != telegram_webhook_secret():
+        # 校验密钥头，拒绝非 Telegram 来源（常量时间比较，避免时间侧信道）
+        if not hmac.compare_digest(
+            request.headers.get("X-Telegram-Bot-Api-Secret-Token", ""),
+            telegram_webhook_secret(),
+        ):
             return ("", 403)
         update = request.get_json(silent=True) or {}
         msg = update.get("message") or update.get("edited_message") or {}
@@ -1537,6 +1548,28 @@ def csp_nonce():
     return getattr(g, "csp_nonce", "")
 
 
+def setup_token_is_valid(token):
+    expected = app.config.get("SETUP_TOKEN") or ""
+    if not expected:
+        return True
+    return hmac.compare_digest(str(token or ""), expected)
+
+
+def csv_safe_cell(value):
+    if value is None:
+        return ""
+    text = str(value)
+    if text.lstrip().startswith(CSV_FORMULA_PREFIXES):
+        return "'" + text
+    return text
+
+
+def csv_export_value(card, field):
+    if field == "tags":
+        return csv_safe_cell(", ".join(card.get(field) or []))
+    return csv_safe_cell(card.get(field, ""))
+
+
 def csrf_is_valid():
     """CSRF token 可来自表单字段 csrf_token 或请求头 X-CSRF-Token。"""
     token = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
@@ -1565,10 +1598,9 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
-# --- 登录限流（内存级，防暴力破解）---
+# --- 登录限流（SQLite 持久化，防暴力破解）---
 LOGIN_MAX_FAILS = 5
 LOGIN_WINDOW = 900  # 15 分钟
-_login_fails = {}
 
 
 def client_ip():
@@ -1584,24 +1616,32 @@ def client_ip():
 
 def login_lock_remaining(ip):
     """返回该 IP 还需冷却的秒数；0 表示未锁定。"""
-    import time
-
     now = time.time()
-    fails = [t for t in _login_fails.get(ip, []) if now - t < LOGIN_WINDOW]
-    _login_fails[ip] = fails
-    if len(fails) >= LOGIN_MAX_FAILS:
-        return int(LOGIN_WINDOW - (now - fails[0]))
+    cutoff = now - LOGIN_WINDOW
+    db = get_db()
+    db.execute("DELETE FROM login_attempts WHERE ts < ?", (cutoff,))
+    db.commit()
+    rows = db.execute(
+        "SELECT ts FROM login_attempts WHERE ip = ? AND ts >= ? ORDER BY ts ASC",
+        (ip, cutoff),
+    ).fetchall()
+    if len(rows) >= LOGIN_MAX_FAILS:
+        return max(1, int(LOGIN_WINDOW - (now - float(rows[0]["ts"]))))
     return 0
 
 
 def record_login_fail(ip):
-    import time
-
-    _login_fails.setdefault(ip, []).append(time.time())
+    now = time.time()
+    cutoff = now - LOGIN_WINDOW
+    db = get_db()
+    db.execute("DELETE FROM login_attempts WHERE ts < ?", (cutoff,))
+    db.execute("INSERT INTO login_attempts (ip, ts) VALUES (?, ?)", (ip, now))
+    db.commit()
 
 
 def clear_login_fails(ip):
-    _login_fails.pop(ip, None)
+    get_db().execute("DELETE FROM login_attempts WHERE ip = ?", (ip,))
+    get_db().commit()
 
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")

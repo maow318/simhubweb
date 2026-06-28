@@ -1,5 +1,8 @@
+import csv
+import io
 import os
 import tempfile
+import time
 import unittest
 
 
@@ -8,13 +11,19 @@ os.environ.setdefault("DATA_ENCRYPTION_KEY", "test-data-key-for-simhub-keeper-we
 os.environ["DATABASE"] = ":memory:"
 
 from app.main import (  # noqa: E402
+    LOGIN_MAX_FAILS,
+    LOGIN_WINDOW,
     app,
+    client_ip,
+    clear_login_fails,
     get_db,
     hash_password,
     init_db,
+    login_lock_remaining,
     insert_card,
     normalize_dto,
     parse_lpa_payload,
+    record_login_fail,
     run_due_reminders,
 )
 
@@ -24,6 +33,9 @@ class SimhubWebTestCase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         app.config["DATABASE"] = os.path.join(self.tmp.name, "simhub-test.sqlite")
         app.config["TESTING"] = True
+        app.config["SETUP_TOKEN"] = ""
+        app.config["SIMHUB_PRODUCTION"] = False
+        app.config["TRUST_PROXY"] = False
         with app.app_context():
             init_db()
             get_db().execute(
@@ -119,6 +131,41 @@ class SimhubWebTestCase(unittest.TestCase):
         )
         self.assertEqual(deleted["deleted"], 1)
 
+    def test_csv_export_neutralizes_formula_cells(self):
+        self.assert_api_ok(
+            self.api_post(
+                "/api/cards",
+                {
+                    "carrier": "=cmd|'/c calc'!A1",
+                    "plan": "+SUM(1,1)",
+                    "category": "@category",
+                    "countryCode": "US",
+                    "price": "-1+2",
+                    "currentBalance": " =BALANCE",
+                    "tags": ["=tag", "safe"],
+                    "smdpAddress": "@smdp.example",
+                    "activationCode": "+ACT",
+                    "eid": "-EID",
+                },
+            ),
+            status=201,
+        )
+
+        response = self.client.get("/export.csv")
+        self.assertEqual(response.status_code, 200)
+        rows = list(csv.reader(io.StringIO(response.get_data(as_text=True))))
+        exported = dict(zip(rows[0], rows[1]))
+
+        self.assertEqual(exported["carrier"], "'=cmd|'/c calc'!A1")
+        self.assertEqual(exported["plan"], "'+SUM(1,1)")
+        self.assertEqual(exported["category"], "'@category")
+        self.assertEqual(exported["price"], "'-1+2")
+        self.assertEqual(exported["currentBalance"], "'=BALANCE")
+        self.assertEqual(exported["tags"], "'=tag, safe")
+        self.assertEqual(exported["smdpAddress"], "'@smdp.example")
+        self.assertEqual(exported["activationCode"], "'+ACT")
+        self.assertEqual(exported["eid"], "'-EID")
+
     def test_import_preview_detects_duplicates_and_unknown_fields(self):
         first = self.assert_api_ok(
             self.api_post(
@@ -188,6 +235,130 @@ class SimhubWebTestCase(unittest.TestCase):
         self.assertEqual(stats["matched"], 0)
         self.assertEqual(stats["sent"], 0)
         self.assertEqual(stats["failed"], 0)
+
+    def test_setup_token_blocks_admin_creation_until_matched(self):
+        app.config["SETUP_TOKEN"] = "setup-secret"
+        with app.app_context():
+            init_db()
+            get_db().execute("DELETE FROM users")
+            get_db().commit()
+        with self.client.session_transaction() as sess:
+            sess["csrf_token"] = "setup-csrf"
+
+        bad = self.client.post(
+            "/setup",
+            data={
+                "csrf_token": "setup-csrf",
+                "setup_token": "wrong",
+                "username": "admin",
+                "password": "password123",
+                "confirm": "password123",
+            },
+        )
+        self.assertEqual(bad.status_code, 200)
+        self.assertIn("SETUP_TOKEN", bad.get_data(as_text=True))
+        with app.app_context():
+            self.assertEqual(get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0], 0)
+
+        good = self.client.post(
+            "/setup",
+            data={
+                "csrf_token": "setup-csrf",
+                "setup_token": "setup-secret",
+                "username": "admin",
+                "password": "password123",
+                "confirm": "password123",
+            },
+        )
+        self.assertEqual(good.status_code, 302)
+        with app.app_context():
+            self.assertEqual(get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+
+    def test_setup_without_token_keeps_local_first_run_flow(self):
+        app.config["SETUP_TOKEN"] = ""
+        with app.app_context():
+            init_db()
+            get_db().execute("DELETE FROM users")
+            get_db().commit()
+        with self.client.session_transaction() as sess:
+            sess["csrf_token"] = "setup-csrf"
+
+        response = self.client.post(
+            "/setup",
+            data={
+                "csrf_token": "setup-csrf",
+                "username": "admin",
+                "password": "password123",
+                "confirm": "password123",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        with app.app_context():
+            self.assertEqual(get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+
+    def test_client_ip_uses_forwarded_for_only_when_trusted(self):
+        app.config["TRUST_PROXY"] = True
+        with app.test_request_context(
+            "/login",
+            headers={"X-Forwarded-For": "198.51.100.24"},
+            environ_base={"REMOTE_ADDR": "172.18.0.10"},
+        ):
+            self.assertEqual(client_ip(), "198.51.100.24")
+
+        app.config["TRUST_PROXY"] = False
+        with app.test_request_context(
+            "/login",
+            headers={"X-Forwarded-For": "198.51.100.24"},
+            environ_base={"REMOTE_ADDR": "172.18.0.10"},
+        ):
+            self.assertEqual(client_ip(), "172.18.0.10")
+
+    def test_login_rate_limit_locks_and_expires_from_database(self):
+        ip = "203.0.113.50"
+        with app.app_context():
+            init_db()
+            clear_login_fails(ip)
+            for _ in range(LOGIN_MAX_FAILS):
+                record_login_fail(ip)
+            self.assertGreater(login_lock_remaining(ip), 0)
+
+            get_db().execute("DELETE FROM login_attempts WHERE ip = ?", (ip,))
+            old_ts = time.time() - LOGIN_WINDOW - 5
+            for _ in range(LOGIN_MAX_FAILS):
+                get_db().execute("INSERT INTO login_attempts (ip, ts) VALUES (?, ?)", (ip, old_ts))
+            get_db().commit()
+            self.assertEqual(login_lock_remaining(ip), 0)
+            self.assertEqual(
+                get_db().execute("SELECT COUNT(*) FROM login_attempts WHERE ip = ?", (ip,)).fetchone()[0],
+                0,
+            )
+
+    def test_successful_login_clears_persisted_failures(self):
+        ip = "203.0.113.77"
+        with app.app_context():
+            init_db()
+            clear_login_fails(ip)
+            record_login_fail(ip)
+            record_login_fail(ip)
+            self.assertEqual(
+                get_db().execute("SELECT COUNT(*) FROM login_attempts WHERE ip = ?", (ip,)).fetchone()[0],
+                2,
+            )
+        with self.client.session_transaction() as sess:
+            sess.pop("user_id", None)
+            sess["csrf_token"] = "login-csrf"
+
+        response = self.client.post(
+            "/login",
+            data={"csrf_token": "login-csrf", "username": "admin", "password": "password123"},
+            environ_overrides={"REMOTE_ADDR": ip},
+        )
+        self.assertEqual(response.status_code, 302)
+        with app.app_context():
+            self.assertEqual(
+                get_db().execute("SELECT COUNT(*) FROM login_attempts WHERE ip = ?", (ip,)).fetchone()[0],
+                0,
+            )
 
 
 if __name__ == "__main__":
