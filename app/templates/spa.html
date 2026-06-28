@@ -420,6 +420,21 @@ header{min-height:62px}
 .qrBox svg{width:min(260px,100%);height:auto;stroke:none}
 .lpaText{word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;background:rgba(255,255,255,.42);border:1px solid var(--line);border-radius:14px;padding:12px}
 .toolActions{display:flex;gap:10px;flex-wrap:wrap}
+.toolTabs{margin:0 0 18px}
+.giffSteps{display:grid}
+.giffStep{border-top:1px solid var(--line);padding:14px 0}
+.giffStep:first-child{border-top:0;padding-top:0}
+.giffStep h4{margin:0 0 10px;font-size:14px}
+.giffCodeRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start}
+.giffStatus{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.34);padding:11px 12px;font-size:13px;color:var(--sub);margin:12px 0}
+.giffStatus.ok{border-color:rgba(22,163,74,.24);background:rgba(22,163,74,.08);color:var(--ok)}
+.giffStatus.warn{border-color:rgba(217,119,6,.26);background:rgba(217,119,6,.08);color:var(--warn)}
+.giffSummary{display:grid;gap:8px;margin-top:10px;font-size:13px}
+.giffSummary div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:7px}
+.giffSummary div:last-child{border-bottom:0;padding-bottom:0}
+.giffSummary b{color:var(--text)}
+.giffDanger{border:1px solid rgba(220,38,38,.22);background:rgba(220,38,38,.07);color:var(--danger);border-radius:14px;padding:11px 12px;font-size:13px;line-height:1.5;margin:10px 0}
+.giffMono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 .dark .seg button.on{background:rgba(255,255,255,.13)}
 .dark .qrBox{background:#f8fafc}
 .dark .previewStat,.dark .fieldChip,.dark .previewBox{background:rgba(255,255,255,.08)}
@@ -495,6 +510,7 @@ header{min-height:62px}
 .setRow .rt span{font-size:12px;color:var(--sub);line-height:1.4}
 input[type=checkbox]{accent-color:var(--accent)}
 @media(max-width:1120px){.statgrid{grid-template-columns:repeat(2,minmax(170px,1fr))}.overviewGrid,.toolsGrid{grid-template-columns:1fr}.toolbarActions{margin-left:0}.cardList{overflow-x:auto}}
+@media(max-width:640px){.giffCodeRow{grid-template-columns:1fr}.toolTabs{display:flex}.toolTabs button{flex:1;padding-inline:8px}}
 @media(max-width:900px){.secretGrid{grid-template-columns:1fr}}
 @media(max-width:760px){.keeperBadge{display:none}.statePill{display:none}.toolbar{display:grid;grid-template-columns:1fr}.toolbar .searchInput,.toolbar select{width:100%;flex:auto}.toolbarActions{width:100%;justify-content:space-between}.statgrid,.previewGrid{grid-template-columns:1fr}.grid{grid-template-columns:minmax(0,1fr);gap:16px}.quickActions{opacity:1;transform:none}.cardInfoGrid{grid-template-columns:1fr}button.logout{width:34px;color:transparent;overflow:hidden}button.logout:before{content:"⏻";color:var(--sub)}}
 
@@ -545,6 +561,8 @@ let cardViewMode=localStorage.getItem('simhub_card_view')||'cards';
 let maskDefault = localStorage.getItem('simhub_mask')!=='off';
 let esimToolTab=localStorage.getItem('simhub_esim_tool_tab')||'parser';
 let lpaToolMode='manual'; let toolCameraStream=null; let toolScanTimer=null;
+let giffTimeTimer=null;
+let giffState={accessToken:'',expiresAt:0,authUrl:'',entryUrl:'',redirectUri:'',member:null,mfaRef:'',mfaSignature:'',lpa:'',parsed:null,applying:false};
 const RECENT_MODS_CLEAR_KEY='simhub_recent_mods_clear_at';
 const CATEGORY_PRESETS=['主号','接码','银行绑定','流量卡','保号','备用','旅行','其他'];
 const EYE='<svg><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -717,12 +735,21 @@ function riskPanelHTML(){
 
 function renderESIMTools(){
   stopToolCamera();
-  if(esimToolTab!=='parser'){
+  clearGiffTimeTimer();
+  if(!['parser','giffgaff'].includes(esimToolTab)){
     esimToolTab='parser';
     localStorage.setItem('simhub_esim_tool_tab','parser');
   }
-  M().innerHTML='<div id="esimToolHost"></div>';
-  renderParserTools();
+  M().innerHTML=`<div class="seg toolTabs"><button id="toolParser" class="${esimToolTab==='parser'?'on':''}">LPA 解析器</button><button id="toolGiffgaff" class="${esimToolTab==='giffgaff'?'on':''}">giffgaff 转 eSIM</button></div><div id="esimToolHost"></div>`;
+  dG('toolParser').onclick=()=>setESIMToolTab('parser');
+  dG('toolGiffgaff').onclick=()=>setESIMToolTab('giffgaff');
+  if(esimToolTab==='giffgaff')renderGiffgaffTools();else renderParserTools();
+}
+
+function setESIMToolTab(tab){
+  esimToolTab=tab;
+  localStorage.setItem('simhub_esim_tool_tab',tab);
+  renderESIMTools();
 }
 
 function renderParserTools(){
@@ -817,6 +844,170 @@ function openDrawerFromLPA(data){
 }
 function defaultCardSeed(){const now=new Date();return {activationDate:isoNoMillis(now),expiryDate:isoNoMillis(addDays(now,30)),createdAt:isoNoMillis(now),isLongTerm:false,renewDays:30,renewalUnit:'days',renewalIntervalValue:30,tags:[],category:''};}
 
+function renderGiffgaffTools(){
+  const host=dG('esimToolHost');if(!host)return;
+  const hasToken=!!giffState.accessToken, hasMember=!!(giffState.member&&giffState.member.memberProfile&&giffState.member.memberProfile.id);
+  const hasMfa=!!giffState.mfaSignature, m=giffState.member||{}, profile=m.memberProfile||{}, sim=m.sim||{};
+  host.innerHTML=`<div class="toolsGrid">
+    <section class="toolPanel">
+      <h3>giffgaff 转 eSIM</h3><p class="sub" style="margin:0">使用 giffgaff OAuth、邮件验证和官方 GraphQL 换卡流程。</p>
+      <div id="giffTimeStatus" class="giffStatus"></div>
+      <div class="giffSteps">
+        <div class="giffStep">
+          <h4>1. 登录 giffgaff</h4>
+          <div class="toolActions"><button id="ggStartLogin">生成登录链接</button><button class="sec" id="ggOpenLogin" ${giffState.entryUrl?'':'disabled'}>打开登录</button></div>
+          <div class="field" style="margin-top:12px"><label>回调 URL 或 code</label><textarea id="ggCallback" rows="3" placeholder="giffgaff://auth/callback/?code=...&state=..."></textarea></div>
+          <div class="toolActions"><button id="ggExchangeToken">换取令牌</button><button class="sec" id="ggClearSession">清空会话</button></div>
+          ${giffState.redirectUri?`<div class="giffStatus giffMono">Redirect URI：${esc(giffState.redirectUri)}</div>`:''}
+        </div>
+        <div class="giffStep">
+          <h4>2. 读取账户</h4>
+          <div class="toolActions"><button id="ggReadMember" ${hasToken?'':'disabled'}>读取账户</button></div>
+          ${hasMember?`<div class="giffSummary"><div><span>会员</span><b>${esc(profile.memberName||profile.id)}</b></div><div><span>号码</span><b>${esc(sim.phoneNumber||'—')}</b></div><div><span>SIM 状态</span><b>${esc(sim.status||'—')}</b></div></div>`:''}
+        </div>
+        <div class="giffStep">
+          <h4>3. 邮件验证</h4>
+          <div class="giffCodeRow"><button id="ggSendMfa" ${hasToken?'':'disabled'}>发送验证码</button><input id="ggCode" inputmode="numeric" maxlength="8" placeholder="邮件验证码"></div>
+          <div class="toolActions" style="margin-top:10px"><button id="ggVerifyMfa" ${giffState.mfaRef?'':'disabled'}>验证邮件码</button></div>
+          ${giffState.mfaRef?`<div class="giffStatus giffMono">MFA ref：${esc(giffState.mfaRef)}</div>`:''}
+        </div>
+        <div class="giffStep">
+          <h4>4. 转换 eSIM</h4>
+          <div class="giffDanger">执行后会发起 giffgaff SIM swap，当前实体 SIM 可能失效。</div>
+          <button id="ggApply" ${hasToken&&hasMember&&hasMfa&&!giffState.applying?'':'disabled'}>${giffState.applying?'转换中…':'预约并转换'}</button>
+        </div>
+      </div>
+    </section>
+    <section class="toolPanel">
+      <h3>giffgaff 输出</h3><p class="sub" style="margin-top:0">LPA 会在本机生成二维码，可直接带入 SIMHUB 卡片。</p>
+      <div class="lpaOutput">
+        <div class="qrBox" id="ggQrBox"><span class="sub">转换完成后显示二维码</span></div>
+        <div class="lpaText" id="ggLpaText">${esc(giffState.lpa||'LPA:1$')}</div>
+        <div class="toolActions"><button id="ggCopyLPA" ${giffState.lpa?'':'disabled'}>复制 LPA</button><button class="sec" id="ggFillCard" ${giffState.lpa?'':'disabled'}>带入新卡片</button><button class="sec" id="ggCopyIOS" ${giffState.lpa?'':'disabled'}>复制 iOS 安装链接</button></div>
+      </div>
+    </section>
+  </div>`;
+  dG('ggStartLogin').onclick=startGiffgaffLogin;
+  dG('ggOpenLogin').onclick=()=>{if(giffState.entryUrl)window.open(giffState.entryUrl,'_blank','noopener');};
+  dG('ggExchangeToken').onclick=exchangeGiffgaffToken;
+  dG('ggClearSession').onclick=clearGiffgaffSession;
+  dG('ggReadMember').onclick=readGiffgaffMember;
+  dG('ggSendMfa').onclick=sendGiffgaffMfa;
+  dG('ggVerifyMfa').onclick=verifyGiffgaffMfa;
+  dG('ggApply').onclick=applyGiffgaffEsim;
+  dG('ggCopyLPA').onclick=()=>copyText(giffState.lpa,'LPA 已复制');
+  dG('ggCopyIOS').onclick=()=>copyText(iosInstallURL(giffState.lpa),'iOS 安装链接已复制');
+  dG('ggFillCard').onclick=openDrawerFromGiffgaff;
+  renderGiffgaffOutput();
+  startGiffTimeTimer();
+}
+
+function clearGiffgaffSession(){
+  giffState={accessToken:'',expiresAt:0,authUrl:'',entryUrl:'',redirectUri:'',member:null,mfaRef:'',mfaSignature:'',lpa:'',parsed:null,applying:false};
+  renderGiffgaffTools();
+}
+
+async function startGiffgaffLogin(){
+  try{
+    const r=await api('/api/giffgaff/oauth/start',{method:'POST',body:JSON.stringify({})});
+    Object.assign(giffState,{authUrl:r.authUrl||'',entryUrl:r.entryUrl||'',redirectUri:r.redirectUri||'',accessToken:'',member:null,mfaRef:'',mfaSignature:''});
+    renderGiffgaffTools();
+    toast('已生成登录链接');
+  }catch(e){toast(e.message||'生成登录链接失败');}
+}
+
+async function exchangeGiffgaffToken(){
+  const value=(dG('ggCallback')?.value||'').trim();
+  if(!value){toast('请粘贴回调 URL 或 code');return;}
+  try{
+    const r=await api('/api/giffgaff/oauth/token',{method:'POST',body:JSON.stringify({callbackUrl:value}),timeoutMs:30000});
+    giffState.accessToken=r.accessToken||'';
+    giffState.expiresAt=Date.now()+((+r.expiresIn||3600)*1000);
+    giffState.member=null;giffState.mfaRef='';giffState.mfaSignature='';
+    renderGiffgaffTools();
+    toast('giffgaff 已登录');
+  }catch(e){toast(e.message||'换取令牌失败');}
+}
+
+async function readGiffgaffMember(){
+  try{
+    giffState.member=await api('/api/giffgaff/member',{method:'POST',body:JSON.stringify({accessToken:giffState.accessToken}),timeoutMs:30000});
+    renderGiffgaffTools();
+    toast('已读取账户');
+  }catch(e){toast(e.message||'读取账户失败');}
+}
+
+async function sendGiffgaffMfa(){
+  try{
+    const r=await api('/api/giffgaff/mfa/challenge',{method:'POST',body:JSON.stringify({accessToken:giffState.accessToken}),timeoutMs:30000});
+    giffState.mfaRef=r.ref||'';giffState.mfaSignature='';
+    renderGiffgaffTools();
+    toast('验证码已发送');
+  }catch(e){toast(e.message||'发送验证码失败');}
+}
+
+async function verifyGiffgaffMfa(){
+  const code=(dG('ggCode')?.value||'').trim();
+  if(!code){toast('请输入邮件验证码');return;}
+  try{
+    const r=await api('/api/giffgaff/mfa/verify',{method:'POST',body:JSON.stringify({accessToken:giffState.accessToken,ref:giffState.mfaRef,code}),timeoutMs:30000});
+    giffState.mfaSignature=r.signature||'';
+    renderGiffgaffTools();
+    toast('邮件验证通过');
+  }catch(e){toast(e.message||'验证失败');}
+}
+
+async function applyGiffgaffEsim(){
+  if(!confirm('确认执行 giffgaff SIM swap 并转换为 eSIM?'))return;
+  const memberId=((giffState.member||{}).memberProfile||{}).id||'';
+  giffState.applying=true;renderGiffgaffTools();
+  try{
+    const r=await api('/api/giffgaff/esim/apply',{method:'POST',body:JSON.stringify({accessToken:giffState.accessToken,memberId,mfaSignature:giffState.mfaSignature,mfaRef:giffState.mfaRef}),timeoutMs:90000});
+    giffState.lpa=r.lpa||'';giffState.parsed=r.parsed||null;giffState.applying=false;
+    renderGiffgaffTools();
+    toast('giffgaff eSIM 已生成');
+  }catch(e){giffState.applying=false;renderGiffgaffTools();toast(e.message||'转换失败');}
+}
+
+function renderGiffgaffOutput(){
+  const box=dG('ggQrBox'), text=dG('ggLpaText');
+  if(text)text.textContent=giffState.lpa||'LPA:1$';
+  if(!box)return;
+  if(!giffState.lpa){box.innerHTML='<span class="sub">转换完成后显示二维码</span>';return;}
+  const svg=makeQRSVG(giffState.lpa);
+  box.innerHTML=svg||'<span class="sub">LPA 太长，当前本地二维码生成器暂不支持；仍可复制 LPA 字符串。</span>';
+}
+
+function openDrawerFromGiffgaff(){
+  const p=giffState.parsed||{};
+  if(!p.smdpAddress||!p.activationCode){toast('缺少完整 LPA');return;}
+  openDrawer(Object.assign(defaultCardSeed(),{carrier:'giffgaff',countryCode:'GB',countryName:'英国',smdpAddress:p.smdpAddress,activationCode:p.activationCode,confirmationCode:p.confirmationCode||''}));
+}
+
+function startGiffTimeTimer(){
+  clearGiffTimeTimer();
+  updateGiffTimeStatus();
+  giffTimeTimer=setInterval(updateGiffTimeStatus,60000);
+}
+
+function clearGiffTimeTimer(){
+  if(giffTimeTimer){clearInterval(giffTimeTimer);giffTimeTimer=null;}
+}
+
+function updateGiffTimeStatus(){
+  const el=dG('giffTimeStatus');if(!el)return;
+  const info=giffLondonWindow();
+  el.className='giffStatus '+(info.open?'ok':'warn');
+  el.textContent=`英国时间 ${info.time} · ${info.open?'服务窗口内':'不在建议窗口内'}`;
+}
+
+function giffLondonWindow(){
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date());
+  const hour=+(parts.find(x=>x.type==='hour')||{}).value||0, minute=+(parts.find(x=>x.type==='minute')||{}).value||0;
+  const total=hour*60+minute, start=4*60+30, end=21*60+30;
+  return {time:String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0'),open:total>=start&&total<=end};
+}
+
 async function detectQRFile(file){
   const msg=dG('qrDetectMsg');if(msg)msg.textContent='正在识别图片…';
   try{
@@ -854,32 +1045,62 @@ function stopToolCamera(){
 
 function makeQRSVG(text){
   const bytes=[...new TextEncoder().encode(text)];
-  const specs={1:[21,19,7,[]],2:[25,34,10,[6,18]],3:[29,55,15,[6,22]],4:[33,80,20,[6,26]],5:[37,108,26,[6,30]]};
-  let spec=null;
-  for(const v of Object.keys(specs)){const s=specs[v];if(bytes.length<=Math.floor((s[1]*8-12)/8)){spec=s;break;}}
+  const spec=qrChooseSpec(bytes.length);
   if(!spec)return '';
-  const [size,dataLen,eccLen,align]=spec, modules=Array.from({length:size},()=>Array(size).fill(false)), func=Array.from({length:size},()=>Array(size).fill(false));
-  const set=(r,c,v,f=true)=>{if(r>=0&&r<size&&c>=0&&c<size){modules[r][c]=!!v;if(f)func[r][c]=true;}};
-  const finder=(r,c)=>{for(let y=-1;y<=7;y++)for(let x=-1;x<=7;x++){const rr=r+y,cc=c+x;if(rr<0||rr>=size||cc<0||cc>=size)continue;const v=y>=0&&y<=6&&x>=0&&x<=6&&(y===0||y===6||x===0||x===6||(y>=2&&y<=4&&x>=2&&x<=4));set(rr,cc,v);}};
-  finder(0,0);finder(0,size-7);finder(size-7,0);
-  for(let i=8;i<size-8;i++){set(6,i,i%2===0);set(i,6,i%2===0);}
-  for(const r of align)for(const c of align){if(func[r][c])continue;for(let y=-2;y<=2;y++)for(let x=-2;x<=2;x++)set(r+y,c+x,Math.max(Math.abs(x),Math.abs(y))!==1);}
-  function reserveFormat(){for(let i=0;i<6;i++)set(8,i,false);set(8,7,false);set(8,8,false);set(7,8,false);for(let i=9;i<15;i++)set(14-i,8,false);for(let i=0;i<8;i++)set(size-1-i,8,false);for(let i=8;i<15;i++)set(8,size-15+i,false);set(size-8,8,true);}
-  reserveFormat();
-  const bits=[];const push=(val,len)=>{for(let i=len-1;i>=0;i--)bits.push((val>>>i)&1);};
-  push(4,4);push(bytes.length,8);bytes.forEach(b=>push(b,8));
-  const cap=dataLen*8;for(let i=0;i<Math.min(4,cap-bits.length);i++)bits.push(0);while(bits.length%8)bits.push(0);
-  const data=[];for(let i=0;i<bits.length;i+=8)data.push(bits.slice(i,i+8).reduce((a,b)=>a*2+b,0));for(let p=0;data.length<dataLen;p++)data.push(p%2?0x11:0xec);
-  const code=data.concat(rs(data,eccLen)), dbits=[];code.forEach(b=>pushTo(dbits,b,8));
-  let bi=0, up=true;for(let right=size-1;right>=1;right-=2){if(right===6)right--;for(let vert=0;vert<size;vert++){const r=up?size-1-vert:vert;for(let j=0;j<2;j++){const c=right-j;if(func[r][c])continue;let bit=bi<dbits.length?dbits[bi++]:0;if((r+c)%2===0)bit^=1;modules[r][c]=!!bit;}}up=!up;}
-  drawFormat(0);
+  const size=spec.version*4+17, base=Array.from({length:size},()=>Array(size).fill(false)), func=Array.from({length:size},()=>Array(size).fill(false));
+  const setFunction=(x,y,v)=>{if(x>=0&&x<size&&y>=0&&y<size){base[y][x]=!!v;func[y][x]=true;}};
+  const finder=(x,y)=>{for(let dy=-1;dy<=7;dy++)for(let dx=-1;dx<=7;dx++){const xx=x+dx,yy=y+dy;if(xx<0||xx>=size||yy<0||yy>=size)continue;const v=dx>=0&&dx<=6&&dy>=0&&dy<=6&&(dx===0||dx===6||dy===0||dy===6||(dx>=2&&dx<=4&&dy>=2&&dy<=4));setFunction(xx,yy,v);}};
+  finder(0,0);finder(size-7,0);finder(0,size-7);
+  for(let i=8;i<size-8;i++){setFunction(i,6,i%2===0);setFunction(6,i,i%2===0);}
+  for(const y of spec.align)for(const x of spec.align){if((x===6&&y===6)||(x===6&&y===size-7)||(x===size-7&&y===6))continue;for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)setFunction(x+dx,y+dy,Math.max(Math.abs(dx),Math.abs(dy))!==1);}
+  reserveFormatAndVersion();
+  const codewords=qrCodewords(bytes,spec), dataBits=[];codewords.forEach(b=>pushBits(dataBits,b,8));
+  let modules=null,bestPenalty=Infinity;
+  for(let mask=0;mask<8;mask++){
+    const trial=base.map(row=>row.slice());
+    placeData(trial,dataBits,mask);
+    drawFormat(trial,mask);
+    if(spec.version>=7)drawVersion(trial);
+    const penalty=qrPenalty(trial);
+    if(penalty<bestPenalty){bestPenalty=penalty;modules=trial;}
+  }
   const q=4, cell=8, dim=(size+q*2)*cell;let out=`<svg viewBox="0 0 ${dim} ${dim}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LPA QR"><rect width="${dim}" height="${dim}" fill="#fff"/>`;
-  for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(modules[r][c])out+=`<rect x="${(c+q)*cell}" y="${(r+q)*cell}" width="${cell}" height="${cell}" fill="#000"/>`;
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(modules[y][x])out+=`<rect x="${(x+q)*cell}" y="${(y+q)*cell}" width="${cell}" height="${cell}" fill="#000"/>`;
   return out+'</svg>';
-  function pushTo(arr,val,len){for(let i=len-1;i>=0;i--)arr.push((val>>>i)&1);}
-  function gfTables(){let exp=Array(512),log=Array(256),x=1;for(let i=0;i<255;i++){exp[i]=x;log[x]=i;x<<=1;if(x&0x100)x^=0x11d;}for(let i=255;i<512;i++)exp[i]=exp[i-255];return{exp,log};}
-  function rs(data,deg){const {exp,log}=gfTables(),mul=(a,b)=>a&&b?exp[log[a]+log[b]]:0;let gen=[1];for(let i=0;i<deg;i++){const next=Array(gen.length+1).fill(0);for(let j=0;j<gen.length;j++){next[j]^=mul(gen[j],1);next[j+1]^=mul(gen[j],exp[i]);}gen=next;}const res=Array(deg).fill(0);for(const b of data){const factor=b^res.shift();res.push(0);for(let i=0;i<deg;i++)res[i]^=mul(gen[i+1],factor);}return res;}
-  function drawFormat(mask){let data=(1<<3)|mask,bits=data<<10;for(let i=14;i>=10;i--)if((bits>>>i)&1)bits^=0x537<<(i-10);bits=((data<<10)|bits)^0x5412;const bit=i=>((bits>>>i)&1)!==0;for(let i=0;i<6;i++)set(8,i,bit(i));set(8,7,bit(6));set(8,8,bit(7));set(7,8,bit(8));for(let i=9;i<15;i++)set(14-i,8,bit(i));for(let i=0;i<8;i++)set(size-1-i,8,bit(i));for(let i=8;i<15;i++)set(8,size-15+i,bit(i));set(size-8,8,true);}
+  function reserveFormatAndVersion(){for(let i=0;i<6;i++)setFunction(8,i,false);setFunction(8,7,false);setFunction(8,8,false);setFunction(7,8,false);for(let i=9;i<15;i++)setFunction(14-i,8,false);for(let i=0;i<8;i++)setFunction(size-1-i,8,false);for(let i=8;i<15;i++)setFunction(8,size-15+i,false);setFunction(8,size-8,true);if(spec.version>=7){for(let i=0;i<18;i++){const a=size-11+i%3,b=Math.floor(i/3);setFunction(a,b,false);setFunction(b,a,false);}}}
+  function pushBits(arr,val,len){for(let i=len-1;i>=0;i--)arr.push((val>>>i)&1);}
+  function qrCodewords(payload,s){
+    const dataLen=s.blocks.reduce((sum,b)=>sum+b[0]*b[2],0),bits=[],countBits=s.version<10?8:16;
+    pushBits(bits,4,4);pushBits(bits,payload.length,countBits);payload.forEach(b=>pushBits(bits,b,8));
+    const cap=dataLen*8;for(let i=0;i<Math.min(4,cap-bits.length);i++)bits.push(0);while(bits.length%8)bits.push(0);
+    const data=[];for(let i=0;i<bits.length;i+=8){let v=0;for(let j=0;j<8;j++)v=(v<<1)|(bits[i+j]||0);data.push(v);}
+    for(let p=0;data.length<dataLen;p++)data.push(p%2?0x11:0xec);
+    const blocks=[];let offset=0;
+    for(const group of s.blocks)for(let i=0;i<group[0];i++){const total=group[1],len=group[2],chunk=data.slice(offset,offset+len);offset+=len;blocks.push({data:chunk,ecc:qrRsRemainder(chunk,total-len)});}
+    const result=[],maxData=Math.max(...blocks.map(b=>b.data.length)),maxEcc=Math.max(...blocks.map(b=>b.ecc.length));
+    for(let i=0;i<maxData;i++)for(const b of blocks)if(i<b.data.length)result.push(b.data[i]);
+    for(let i=0;i<maxEcc;i++)for(const b of blocks)if(i<b.ecc.length)result.push(b.ecc[i]);
+    return result;
+  }
+  function placeData(m,bits,mask){let bi=0,up=true;for(let right=size-1;right>=1;right-=2){if(right===6)right--;for(let vert=0;vert<size;vert++){const y=up?size-1-vert:vert;for(let j=0;j<2;j++){const x=right-j;if(func[y][x])continue;let dark=bi<bits.length?bits[bi++]!==0:false;if(qrMask(mask,x,y))dark=!dark;m[y][x]=dark;}}up=!up;}}
+  function drawFormat(m,mask){const bits=qrBchFormat((spec.formatBits<<3)|mask),bit=i=>((bits>>>i)&1)!==0;for(let i=0;i<6;i++)m[i][8]=bit(i);m[7][8]=bit(6);m[8][8]=bit(7);m[8][7]=bit(8);for(let i=9;i<15;i++)m[8][14-i]=bit(i);for(let i=0;i<8;i++)m[8][size-1-i]=bit(i);for(let i=8;i<15;i++)m[size-15+i][8]=bit(i);m[size-8][8]=true;}
+  function drawVersion(m){const bits=qrBchVersion(spec.version),bit=i=>((bits>>>i)&1)!==0;for(let i=0;i<18;i++){const a=size-11+i%3,b=Math.floor(i/3);m[b][a]=bit(i);m[a][b]=bit(i);}}
+  function qrChooseSpec(byteLen){
+    const align=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+    const q=[[[1,26,13]],[[1,44,22]],[[2,35,17]],[[2,50,24]],[[2,33,15],[2,34,16]],[[4,43,19]],[[2,32,14],[4,33,15]],[[4,40,18],[2,41,19]],[[4,36,16],[4,37,17]],[[6,43,19],[2,44,20]]];
+    const l=[[[1,26,19]],[[1,44,34]],[[1,70,55]],[[1,100,80]],[[1,134,108]],[[2,86,68]],[[2,98,78]],[[2,121,97]],[[2,146,116]],[[2,86,68],[2,87,69]]];
+    for(const cfg of [{blocks:q,formatBits:3},{blocks:l,formatBits:1}]){
+      for(let i=0;i<cfg.blocks.length;i++){const version=i+1,countBits=version<10?8:16,dataLen=cfg.blocks[i].reduce((sum,b)=>sum+b[0]*b[2],0);if(byteLen<(1<<countBits)&&4+countBits+byteLen*8<=dataLen*8)return{version,align:align[i],blocks:cfg.blocks[i],formatBits:cfg.formatBits};}
+    }
+    return null;
+  }
+  function qrGfMul(x,y){let z=0;for(let i=7;i>=0;i--){z=(z<<1)^(((z>>>7)&1)?0x11d:0);if(((y>>>i)&1)!==0)z^=x;}return z;}
+  function qrRsDivisor(deg){const res=Array(deg).fill(0);res[deg-1]=1;let root=1;for(let i=0;i<deg;i++){for(let j=0;j<deg;j++){res[j]=qrGfMul(res[j],root);if(j+1<deg)res[j]^=res[j+1];}root=qrGfMul(root,2);}return res;}
+  function qrRsRemainder(data,deg){const div=qrRsDivisor(deg),res=Array(deg).fill(0);for(const b of data){const factor=b^res.shift();res.push(0);for(let i=0;i<deg;i++)res[i]^=qrGfMul(div[i],factor);}return res;}
+  function qrBchFormat(data){let rem=data;for(let i=0;i<10;i++)rem=(rem<<1)^(((rem>>>9)&1)?0x537:0);return ((data<<10)|rem)^0x5412;}
+  function qrBchVersion(version){let rem=version;for(let i=0;i<12;i++)rem=(rem<<1)^(((rem>>>11)&1)?0x1f25:0);return(version<<12)|rem;}
+  function qrMask(mask,x,y){switch(mask){case 0:return(x+y)%2===0;case 1:return y%2===0;case 2:return x%3===0;case 3:return(x+y)%3===0;case 4:return(Math.floor(y/2)+Math.floor(x/3))%2===0;case 5:return((x*y)%2+(x*y)%3)===0;case 6:return(((x*y)%2+(x*y)%3)%2)===0;default:return(((x+y)%2+(x*y)%3)%2)===0;}}
+  function qrPenalty(m){let p=0,dark=0,total=size*size;for(let y=0;y<size;y++){let runColor=m[y][0],run=1;for(let x=1;x<size;x++){if(m[y][x]===runColor)run++;else{if(run>=5)p+=run-2;runColor=m[y][x];run=1;}}if(run>=5)p+=run-2;}for(let x=0;x<size;x++){let runColor=m[0][x],run=1;for(let y=1;y<size;y++){if(m[y][x]===runColor)run++;else{if(run>=5)p+=run-2;runColor=m[y][x];run=1;}}if(run>=5)p+=run-2;}for(let y=0;y<size-1;y++)for(let x=0;x<size-1;x++){const c=m[y][x];if(c===m[y][x+1]&&c===m[y+1][x]&&c===m[y+1][x+1])p+=3;}const pat=[true,false,true,true,true,false,true,false,false,false,false];for(let y=0;y<size;y++)for(let x=0;x<=size-11;x++){let ok=true,inv=true;for(let k=0;k<11;k++){if(m[y][x+k]!==pat[k])ok=false;if(m[y][x+k]===pat[k])inv=false;}if(ok||inv)p+=40;}for(let x=0;x<size;x++)for(let y=0;y<=size-11;y++){let ok=true,inv=true;for(let k=0;k<11;k++){if(m[y+k][x]!==pat[k])ok=false;if(m[y+k][x]===pat[k])inv=false;}if(ok||inv)p+=40;}for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(m[y][x])dark++;return p+Math.floor(Math.abs(dark*20-total*10)/total)*10;}
 }
 
 function renderOverview(){

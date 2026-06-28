@@ -4,6 +4,8 @@ import os
 import tempfile
 import time
 import unittest
+import urllib.parse
+from unittest import mock
 
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-simhub-keeper-web-0001")
@@ -36,6 +38,9 @@ class SimhubWebTestCase(unittest.TestCase):
         app.config["SETUP_TOKEN"] = ""
         app.config["SIMHUB_PRODUCTION"] = False
         app.config["TRUST_PROXY"] = False
+        app.config["GIFFGAFF_CLIENT_ID"] = ""
+        app.config["GIFFGAFF_CLIENT_SECRET"] = ""
+        app.config["GIFFGAFF_REDIRECT_URI"] = "giffgaff://auth/callback/"
         with app.app_context():
             init_db()
             get_db().execute(
@@ -165,6 +170,80 @@ class SimhubWebTestCase(unittest.TestCase):
         self.assertEqual(exported["smdpAddress"], "'@smdp.example")
         self.assertEqual(exported["activationCode"], "'+ACT")
         self.assertEqual(exported["eid"], "'-EID")
+
+    def test_giffgaff_oauth_start_builds_pkce_login_url(self):
+        app.config["GIFFGAFF_CLIENT_ID"] = "client-id"
+        app.config["GIFFGAFF_CLIENT_SECRET"] = "client-secret"
+        data = self.assert_api_ok(self.api_post("/api/giffgaff/oauth/start", {}))
+
+        entry = urllib.parse.urlparse(data["entryUrl"])
+        entry_qs = dict(urllib.parse.parse_qsl(entry.query))
+        auth = urllib.parse.urlparse(entry_qs["redirect"])
+        auth_qs = dict(urllib.parse.parse_qsl(auth.query))
+
+        self.assertEqual(entry.netloc, "www.giffgaff.com")
+        self.assertEqual(auth.netloc, "id.giffgaff.com")
+        self.assertEqual(auth_qs["client_id"], "client-id")
+        self.assertEqual(auth_qs["redirect_uri"], "giffgaff://auth/callback/")
+        self.assertEqual(auth_qs["code_challenge_method"], "S256")
+        self.assertTrue(auth_qs["code_challenge"])
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess["giffgaff_oauth"]["state"], data["state"])
+            self.assertTrue(sess["giffgaff_oauth"]["codeVerifier"])
+
+    def test_giffgaff_apply_esim_returns_lpa_from_reference_flow(self):
+        calls = []
+
+        def fake_graphql(access_token, query, variables=None):
+            calls.append((access_token, query, variables or {}))
+            if "reserveESim" in query:
+                self.assertEqual(variables["input"]["memberId"], "member-1")
+                self.assertEqual(variables["input"]["userIntent"], "SWITCH")
+                return {
+                    "reserveESim": {
+                        "id": "reservation-1",
+                        "status": "RESERVED",
+                        "esim": {"ssn": "reserved-ssn", "activationCode": "ACT-1"},
+                    }
+                }
+            if "SwapSim" in query:
+                self.assertEqual(variables["activationCode"], "ACT-1")
+                self.assertEqual(variables["mfaSignature"], "sig-1")
+                self.assertEqual(variables["mfaRef"], "ref-1")
+                return {"swapSim": {"old": {"ssn": "old-ssn"}, "new": {"ssn": "new-ssn", "activationCode": "ACT-2"}}}
+            if "getESims" in query:
+                self.assertEqual(variables["deliveryStatus"], "DOWNLOADABLE")
+                return {"eSims": [{"ssn": "new-ssn"}]}
+            if "eSimDownloadToken" in query:
+                self.assertEqual(variables["ssn"], "new-ssn")
+                return {
+                    "eSimDownloadToken": {
+                        "id": "token-1",
+                        "host": "rsp.giffgaff.example",
+                        "matchingId": "MATCH-1",
+                        "lpaString": "LPA:1$rsp.giffgaff.example$MATCH-1",
+                    }
+                }
+            raise AssertionError(query)
+
+        with mock.patch("app.main.giffgaff_graphql", side_effect=fake_graphql):
+            data = self.assert_api_ok(
+                self.api_post(
+                    "/api/giffgaff/esim/apply",
+                    {
+                        "accessToken": "token-1",
+                        "memberId": "member-1",
+                        "mfaSignature": "sig-1",
+                        "mfaRef": "ref-1",
+                    },
+                )
+            )
+
+        self.assertEqual(data["lpa"], "LPA:1$rsp.giffgaff.example$MATCH-1")
+        self.assertEqual(data["parsed"]["smdpAddress"], "rsp.giffgaff.example")
+        self.assertEqual(data["parsed"]["activationCode"], "MATCH-1")
+        self.assertEqual(data["downloadToken"]["matchingId"], "MATCH-1")
+        self.assertEqual(len(calls), 4)
 
     def test_import_preview_detects_duplicates_and_unknown_fields(self):
         first = self.assert_api_ok(

@@ -75,6 +75,13 @@ PLACEHOLDER_SECRET_PREFIXES = (
 ENCRYPTED_PREFIX = "enc:v1:"
 CARD_SECRET_FIELDS = {"smdpAddress", "activationCode", "confirmationCode", "eid"}
 CSV_FORMULA_PREFIXES = ("=", "+", "-", "@")
+GIFFGAFF_AUTH_URL = "https://id.giffgaff.com/auth/oauth/authorize"
+GIFFGAFF_LOGIN_ENTRY_URL = "https://www.giffgaff.com/auth/login"
+GIFFGAFF_TOKEN_URL = "https://id.giffgaff.com/auth/oauth/token"
+GIFFGAFF_MFA_CHALLENGE_URL = "https://id.giffgaff.com/v4/mfa/challenge/me"
+GIFFGAFF_MFA_VALIDATE_URL = "https://id.giffgaff.com/v4/mfa/validation"
+GIFFGAFF_GRAPHQL_URL = "https://publicapi.giffgaff.com/gateway/graphql"
+GIFFGAFF_DEFAULT_REDIRECT_URI = "giffgaff://auth/callback/"
 MAX_CONTENT_LENGTH = env_int("MAX_CONTENT_LENGTH", 8 * 1024 * 1024)
 MAX_IMPORT_CARDS = env_int("MAX_IMPORT_CARDS", 1000)
 MAX_BACKGROUND_IMAGE_CHARS = env_int("MAX_BACKGROUND_IMAGE_CHARS", 1_500_000)
@@ -305,6 +312,9 @@ def create_app():
     app.config["SIMHUB_PRODUCTION"] = production
     app.config["PUBLIC_BASE_URL"] = public_base_url_from_env()
     app.config["SETUP_TOKEN"] = (os.environ.get("SETUP_TOKEN") or "").strip()
+    app.config["GIFFGAFF_CLIENT_ID"] = (os.environ.get("GIFFGAFF_CLIENT_ID") or "").strip()
+    app.config["GIFFGAFF_CLIENT_SECRET"] = (os.environ.get("GIFFGAFF_CLIENT_SECRET") or "").strip()
+    app.config["GIFFGAFF_REDIRECT_URI"] = (os.environ.get("GIFFGAFF_REDIRECT_URI") or GIFFGAFF_DEFAULT_REDIRECT_URI).strip()
     # 仅当部署在可信反代后（由它覆盖 X-Forwarded-For）时才信任转发头取客户端 IP
     app.config["TRUST_PROXY"] = (os.environ.get("TRUST_PROXY", "") or "").lower() in ("1", "true", "yes", "on")
 
@@ -672,6 +682,12 @@ def create_app():
                             {"method": "GET", "path": "/api/export", "description": "导出兼容 App 的 JSON"},
                             {"method": "POST", "path": "/api/import", "description": "预览或提交导入 JSON"},
                             {"method": "POST", "path": "/api/lpa/parse", "description": "解析 LPA 字符串"},
+                            {"method": "POST", "path": "/api/giffgaff/oauth/start", "description": "生成 giffgaff OAuth 登录链接"},
+                            {"method": "POST", "path": "/api/giffgaff/oauth/token", "description": "用 giffgaff 回调 code 换取访问令牌"},
+                            {"method": "POST", "path": "/api/giffgaff/member", "description": "读取 giffgaff 会员与 SIM 信息"},
+                            {"method": "POST", "path": "/api/giffgaff/mfa/challenge", "description": "发送 giffgaff 换卡邮件验证码"},
+                            {"method": "POST", "path": "/api/giffgaff/mfa/verify", "description": "验证 giffgaff 邮件验证码"},
+                            {"method": "POST", "path": "/api/giffgaff/esim/apply", "description": "预约、换卡并获取 giffgaff eSIM LPA"},
                         ],
                     },
                     {
@@ -801,6 +817,98 @@ def create_app():
         if not result:
             return api_fail("LPA 格式不正确，应类似 LPA:1$smdp.example.com$MATCHINGID；只有 SM-DP+ 时也支持 LPA:1$smdp.example.com$", "BAD_LPA", 400)
         return api_ok(result)
+
+    @app.route("/api/giffgaff/oauth/start", methods=["POST"])
+    @login_required
+    def api_giffgaff_oauth_start():
+        err = api_guard()
+        if err:
+            return err
+        try:
+            return api_ok(giffgaff_oauth_start())
+        except ValueError as exc:
+            return api_fail(str(exc), "GIFFGAFF_NOT_CONFIGURED", 400)
+
+    @app.route("/api/giffgaff/oauth/token", methods=["POST"])
+    @login_required
+    def api_giffgaff_oauth_token():
+        err = api_guard()
+        if err:
+            return err
+        body = request.get_json(silent=True) or {}
+        try:
+            code, state = giffgaff_oauth_code_from_body(body)
+            token = giffgaff_exchange_code(code, state)
+            return api_ok(giffgaff_public_token(token))
+        except ValueError as exc:
+            return api_fail(str(exc), "BAD_GIFFGAFF_OAUTH", 400)
+        except Exception as exc:
+            return api_fail(f"giffgaff 登录失败：{error_text(exc)}", "GIFFGAFF_OAUTH_FAILED", 502)
+
+    @app.route("/api/giffgaff/member", methods=["POST"])
+    @login_required
+    def api_giffgaff_member():
+        err = api_guard()
+        if err:
+            return err
+        body = request.get_json(silent=True) or {}
+        access_token = text_field(body, "accessToken")
+        if not access_token:
+            return api_fail("缺少 giffgaff access token", "NO_GIFFGAFF_TOKEN", 400)
+        try:
+            return api_ok(giffgaff_member_info(access_token))
+        except Exception as exc:
+            return api_fail(f"读取 giffgaff 账户失败：{error_text(exc)}", "GIFFGAFF_MEMBER_FAILED", 502)
+
+    @app.route("/api/giffgaff/mfa/challenge", methods=["POST"])
+    @login_required
+    def api_giffgaff_mfa_challenge():
+        err = api_guard()
+        if err:
+            return err
+        body = request.get_json(silent=True) or {}
+        access_token = text_field(body, "accessToken")
+        if not access_token:
+            return api_fail("缺少 giffgaff access token", "NO_GIFFGAFF_TOKEN", 400)
+        try:
+            return api_ok(giffgaff_send_mfa(access_token))
+        except Exception as exc:
+            return api_fail(f"发送 giffgaff 验证码失败：{error_text(exc)}", "GIFFGAFF_MFA_FAILED", 502)
+
+    @app.route("/api/giffgaff/mfa/verify", methods=["POST"])
+    @login_required
+    def api_giffgaff_mfa_verify():
+        err = api_guard()
+        if err:
+            return err
+        body = request.get_json(silent=True) or {}
+        access_token = text_field(body, "accessToken")
+        ref = text_field(body, "ref")
+        code = text_field(body, "code")
+        if not access_token or not ref or not code:
+            return api_fail("请先发送验证码并填写邮件验证码", "BAD_GIFFGAFF_MFA", 400)
+        try:
+            return api_ok(giffgaff_verify_mfa(access_token, ref, code))
+        except Exception as exc:
+            return api_fail(f"验证 giffgaff 邮件码失败：{error_text(exc)}", "GIFFGAFF_MFA_VERIFY_FAILED", 502)
+
+    @app.route("/api/giffgaff/esim/apply", methods=["POST"])
+    @login_required
+    def api_giffgaff_esim_apply():
+        err = api_guard()
+        if err:
+            return err
+        body = request.get_json(silent=True) or {}
+        access_token = text_field(body, "accessToken")
+        member_id = text_field(body, "memberId")
+        mfa_signature = text_field(body, "mfaSignature")
+        mfa_ref = text_field(body, "mfaRef")
+        if not access_token or not member_id or not mfa_signature:
+            return api_fail("请先完成 giffgaff 登录、账户读取和邮件验证", "BAD_GIFFGAFF_APPLY", 400)
+        try:
+            return api_ok(giffgaff_apply_esim(access_token, member_id, mfa_signature, mfa_ref))
+        except Exception as exc:
+            return api_fail(f"giffgaff 转 eSIM 失败：{error_text(exc)}", "GIFFGAFF_APPLY_FAILED", 502)
 
     @app.route("/api/export")
     @login_required
@@ -1701,6 +1809,353 @@ def safe_optional_http_url(value):
 
 def safe_app_icon_url(value):
     return safe_https_url(value, {"mzstatic.com"})
+
+
+def giffgaff_oauth_config():
+    client_id = app.config.get("GIFFGAFF_CLIENT_ID") or ""
+    client_secret = app.config.get("GIFFGAFF_CLIENT_SECRET") or ""
+    redirect_uri = app.config.get("GIFFGAFF_REDIRECT_URI") or GIFFGAFF_DEFAULT_REDIRECT_URI
+    if not client_id or not client_secret:
+        raise ValueError("请先配置 GIFFGAFF_CLIENT_ID 和 GIFFGAFF_CLIENT_SECRET")
+    return client_id, client_secret, redirect_uri
+
+
+def giffgaff_oauth_start():
+    client_id, _client_secret, redirect_uri = giffgaff_oauth_config()
+    verifier = secrets.token_urlsafe(48)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest()).decode("ascii").rstrip("=")
+    state = secrets.token_urlsafe(24)
+    session["giffgaff_oauth"] = {
+        "codeVerifier": verifier,
+        "state": state,
+        "createdAt": time.time(),
+    }
+    auth_query = urllib.parse.urlencode(
+        {
+            "client_id": client_id,
+            "response_type": "code",
+            "scope": "read",
+            "state": state,
+            "redirect_uri": redirect_uri,
+            "code_challenge_method": "S256",
+            "code_challenge": challenge,
+        }
+    )
+    auth_url = f"{GIFFGAFF_AUTH_URL}?{auth_query}"
+    entry_query = urllib.parse.urlencode({"device": "app", "redirect": auth_url})
+    return {
+        "authUrl": auth_url,
+        "entryUrl": f"{GIFFGAFF_LOGIN_ENTRY_URL}?{entry_query}",
+        "redirectUri": redirect_uri,
+        "state": state,
+    }
+
+
+def giffgaff_oauth_code_from_body(body):
+    raw = str(body.get("callbackUrl") or body.get("url") or body.get("code") or "").strip()
+    if not raw:
+        raise ValueError("请粘贴 giffgaff 回调 URL 或 code")
+    code = raw
+    state = str(body.get("state") or "").strip()
+    if "://" in raw or "?" in raw:
+        parsed = urllib.parse.urlparse(raw)
+        query = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
+        code = query.get("code") or ""
+        state = query.get("state") or state
+    if not code:
+        raise ValueError("回调里没有 code")
+    return code, state
+
+
+def giffgaff_exchange_code(code, state=""):
+    client_id, client_secret, redirect_uri = giffgaff_oauth_config()
+    pending = session.get("giffgaff_oauth") or {}
+    verifier = pending.get("codeVerifier") or ""
+    expected_state = pending.get("state") or ""
+    created_at = float(pending.get("createdAt") or 0)
+    if not verifier:
+        raise ValueError("请先生成 giffgaff 登录链接")
+    if time.time() - created_at > 900:
+        session.pop("giffgaff_oauth", None)
+        raise ValueError("giffgaff 登录链接已过期，请重新生成")
+    if state and expected_state and not hmac.compare_digest(state, expected_state):
+        raise ValueError("giffgaff OAuth state 不匹配")
+    payload = urllib.parse.urlencode(
+        {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "code_verifier": verifier,
+        }
+    ).encode("utf-8")
+    auth = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("ascii")
+    token = giffgaff_http_json(
+        GIFFGAFF_TOKEN_URL,
+        payload,
+        {
+            "Authorization": f"Basic {auth}",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        },
+    )
+    session.pop("giffgaff_oauth", None)
+    return token
+
+
+def giffgaff_public_token(token):
+    return {
+        "tokenType": token.get("token_type") or token.get("type") or "Bearer",
+        "accessToken": token.get("access_token") or token.get("accessToken") or "",
+        "expiresIn": parse_int(token.get("expires_in") or token.get("expiresIn"), 0),
+    }
+
+
+def giffgaff_headers(access_token="", content_type="application/json"):
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": content_type,
+        "x-gg-app-os": "iOS",
+        "x-gg-app-os-version": "26.1",
+        "x-gg-app-build-number": "722",
+        "x-gg-app-device-manufacturer": "Apple",
+        "x-gg-app-version": "17.54.1",
+        "x-gg-app-device-model": "iPhone",
+        "x-gg-app-device-id": "iPhone17,1",
+    }
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    return headers
+
+
+def giffgaff_http_json(url, payload, headers, timeout=30):
+    req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", "replace")
+        raise RuntimeError(giffgaff_error_message(raw) or f"HTTP {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(getattr(exc, "reason", exc)) from exc
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("giffgaff 返回了无法解析的响应") from exc
+
+
+def giffgaff_json_post(url, data, access_token=""):
+    payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
+    return giffgaff_http_json(url, payload, giffgaff_headers(access_token))
+
+
+def giffgaff_error_message(raw):
+    try:
+        data = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return str(raw or "").strip()
+    if isinstance(data, dict):
+        if data.get("error_description"):
+            return str(data["error_description"])
+        if data.get("message"):
+            return str(data["message"])
+        errors = data.get("errors")
+        if isinstance(errors, list) and errors:
+            messages = [str(item.get("message") or item) for item in errors if item]
+            return "；".join(messages)
+    return ""
+
+
+def giffgaff_graphql(access_token, query, variables=None):
+    body = giffgaff_json_post(
+        GIFFGAFF_GRAPHQL_URL,
+        {"query": query, "variables": variables or {}},
+        access_token,
+    )
+    errors = body.get("errors") if isinstance(body, dict) else None
+    if errors:
+        messages = [str(item.get("message") or item) for item in errors if item]
+        raise RuntimeError("；".join(messages) or "GraphQL error")
+    data = body.get("data") if isinstance(body, dict) else None
+    if data is None:
+        raise RuntimeError("giffgaff 响应缺少 data")
+    return data
+
+
+def giffgaff_member_info(access_token):
+    data = giffgaff_graphql(
+        access_token,
+        """
+        query getMemberProfileAndSim {
+          memberProfile {
+            id
+            memberName
+            __typename
+          }
+          sim {
+            phoneNumber
+            status
+            __typename
+          }
+        }
+        """,
+    )
+    return {
+        "memberProfile": data.get("memberProfile") or {},
+        "sim": data.get("sim") or {},
+    }
+
+
+def giffgaff_send_mfa(access_token):
+    query = """
+    mutation simSwapMfaChallenge {
+      simSwapMfaChallenge {
+        ref
+        methods {
+          value
+          channel
+          __typename
+        }
+        __typename
+      }
+    }
+    """
+    try:
+        data = giffgaff_graphql(access_token, query)
+        challenge = data.get("simSwapMfaChallenge") or {}
+        if challenge.get("ref"):
+            challenge["source"] = "graphql"
+            return challenge
+    except Exception:
+        pass
+    challenge = giffgaff_json_post(
+        GIFFGAFF_MFA_CHALLENGE_URL,
+        {"source": "esim", "preferredChannels": ["EMAIL"]},
+        access_token,
+    )
+    if not challenge.get("ref"):
+        raise RuntimeError("未拿到 giffgaff MFA ref")
+    challenge["source"] = "rest"
+    return challenge
+
+
+def giffgaff_verify_mfa(access_token, ref, code):
+    data = giffgaff_json_post(
+        GIFFGAFF_MFA_VALIDATE_URL,
+        {"ref": ref, "code": code},
+        access_token,
+    )
+    signature = data.get("signature") if isinstance(data, dict) else ""
+    if not signature:
+        raise RuntimeError("未拿到 giffgaff MFA signature")
+    return {"signature": signature}
+
+
+def giffgaff_apply_esim(access_token, member_id, mfa_signature, mfa_ref=""):
+    reserve_data = giffgaff_graphql(
+        access_token,
+        """
+        mutation reserveESim($input: ESimReservationInput!) {
+          reserveESim: reserveESim(input: $input) {
+            id
+            memberId
+            reservationStartDate
+            reservationEndDate
+            status
+            esim {
+              ssn
+              activationCode
+              deliveryStatus
+              associatedMemberId
+              __typename
+            }
+            __typename
+          }
+        }
+        """,
+        {"input": {"memberId": member_id, "userIntent": "SWITCH"}},
+    )
+    reserve = reserve_data.get("reserveESim") or {}
+    esim = reserve.get("esim") or {}
+    activation_code = esim.get("activationCode") or ""
+    if not activation_code:
+        raise RuntimeError("giffgaff 预约 eSIM 后没有返回 activationCode")
+
+    swap_data = giffgaff_graphql(
+        access_token,
+        """
+        mutation SwapSim($activationCode: String!, $mfaSignature: String!, $mfaRef: String) {
+          swapSim(activationCode: $activationCode, mfaSignature: $mfaSignature, mfaRef: $mfaRef) {
+            old {
+              ssn
+              activationCode
+              __typename
+            }
+            new {
+              ssn
+              activationCode
+              __typename
+            }
+            __typename
+          }
+        }
+        """,
+        {
+            "activationCode": activation_code,
+            "mfaSignature": mfa_signature,
+            "mfaRef": mfa_ref or None,
+        },
+    )
+    swap = swap_data.get("swapSim") or {}
+    new_esim = swap.get("new") or {}
+    ssn = new_esim.get("ssn") or esim.get("ssn") or ""
+    if not ssn:
+        raise RuntimeError("giffgaff 换卡后没有返回新 eSIM SSN")
+
+    try:
+        giffgaff_graphql(
+            access_token,
+            """
+            query getESims($deliveryStatus: ESimDeliveryStatus!) {
+              eSims(deliveryStatus: $deliveryStatus) {
+                ssn
+                __typename
+              }
+            }
+            """,
+            {"deliveryStatus": "DOWNLOADABLE"},
+        )
+    except Exception:
+        pass
+
+    token_data = giffgaff_graphql(
+        access_token,
+        """
+        query eSimDownloadToken($ssn: String!) {
+          eSimDownloadToken(ssn: $ssn) {
+            id
+            host
+            matchingId
+            lpaString
+            __typename
+          }
+        }
+        """,
+        {"ssn": ssn},
+    )
+    download = token_data.get("eSimDownloadToken") or {}
+    lpa = download.get("lpaString") or ""
+    if not lpa:
+        raise RuntimeError("giffgaff 没有返回 LPA 字符串")
+    parsed = parse_lpa_payload(lpa) or {}
+    return {
+        "reserve": reserve,
+        "swap": swap,
+        "downloadToken": download,
+        "lpa": lpa,
+        "parsed": parsed,
+    }
 
 
 def mask_email(email):

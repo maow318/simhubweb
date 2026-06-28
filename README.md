@@ -11,14 +11,12 @@ SIMHUB Web 是一个自托管的 SIM / eSIM 卡片管理后台，用来记录运
 - 卡片管理：卡片视图 / 列表视图、搜索、国家筛选、状态筛选、批量编辑、批量删除
 - 卡片详情：运营商、国家/地区、号码、套餐、价格、备注、官网、App Store 入口、LPA / EID 信息
 - 国旗背景卡片：按国家/地区自动匹配卡片背景，可清除或手动设置
-- eSIM 解析器：支持手动输入、二维码图片识别、摄像头扫描，生成 LPA 字符串和二维码
+- eSIM 工具：LPA 解析器、二维码识别、摄像头扫描、giffgaff 转 eSIM
 - 导入导出：JSON / CSV 导入导出，导入前预览，兼容 App 备份格式
 - 通知提醒：邮件、Telegram、Webhook，到期提醒和单卡操作提醒
 - 提醒历史和最近活动清理
 - 深色 / 浅色主题，浅色玻璃拟态 UI
 - Docker Compose、HTTPS Caddy、systemd + nginx 部署方式
-
-> 第三方运营商转换工具当前未包含在正式 UI 中，后续等流程稳定后再考虑加入。
 
 ## 项目结构
 
@@ -115,6 +113,16 @@ MAX_CONTENT_LENGTH=8388608
 MAX_IMPORT_CARDS=1000
 ```
 
+giffgaff 转 eSIM 工具：
+
+```env
+GIFFGAFF_CLIENT_ID=
+GIFFGAFF_CLIENT_SECRET=
+GIFFGAFF_REDIRECT_URI=giffgaff://auth/callback/
+```
+
+`GIFFGAFF_CLIENT_ID` 和 `GIFFGAFF_CLIENT_SECRET` 用于 giffgaff OAuth；建议只写入服务器 `.env`，不要提交真实值。
+
 邮件、Telegram、Webhook 通知主要在网页「设置」里配置，不需要直接写环境变量。
 
 ## 数据与备份
@@ -172,9 +180,9 @@ REMINDER_SCAN_INTERVAL_SECONDS=3600
 
 `DATA_ENCRYPTION_KEY` 必须长期固定。丢失后，已加密的通知配置和 eSIM 敏感字段无法解密，需要重新填写。
 
-## eSIM 解析器
+## eSIM 工具
 
-后台的「eSIM 工具」目前只保留通用解析器：
+后台的「eSIM 工具」包含：
 
 - 手动输入 `LPA:1$smdp.example.com$MATCHINGID`
 - 从二维码图片识别 LPA
@@ -182,8 +190,9 @@ REMINDER_SCAN_INTERVAL_SECONDS=3600
 - 生成二维码
 - 复制 iOS 安装链接
 - 带入新卡片表单
+- giffgaff OAuth 登录、邮件验证码、SIM swap、获取 eSIM LPA
 
-解析在浏览器和本服务内完成，不会发送到第三方二维码解析服务。
+通用 LPA 解析和二维码生成在浏览器和本服务内完成，不会发送到第三方二维码解析服务。giffgaff 转 eSIM 会调用 giffgaff 官方接口，access token 仅用于当前浏览器会话，不写入 SIMHUB 数据库。
 
 ## API 概览
 
