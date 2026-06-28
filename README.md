@@ -47,9 +47,11 @@ Docker Compose + Caddy + HTTPS + SQLite 数据卷
 - VPS 开放 80 / 443 端口
 - 已安装 Docker 和 Docker Compose
 
-## 快速部署
+## Docker 部署方式
 
-### 1. 拉取项目
+### 方式一：生产 HTTPS 部署（推荐）
+
+适合公网服务器和正式使用。Caddy 会自动申请 HTTPS 证书，应用容器不直接暴露到公网。
 
 ```bash
 git clone https://github.com/maow318/simhubweb.git
@@ -57,9 +59,7 @@ cd simhubweb
 cp .env.example .env
 ```
 
-### 2. 生成密钥
-
-分别生成 `SECRET_KEY`、`DATA_ENCRYPTION_KEY` 和 `SETUP_TOKEN`：
+生成三个随机值：
 
 ```bash
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"
@@ -67,27 +67,21 @@ python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 python3 -c "import secrets; print(secrets.token_urlsafe(24))"
 ```
 
-把生成结果写入 `.env`：
+编辑 `.env`，至少填写：
 
 ```env
-SECRET_KEY=替换为第一条随机值
-DATA_ENCRYPTION_KEY=替换为第二条随机值
-SETUP_TOKEN=替换为第三条随机值
-SIMHUB_DOMAIN=simhub.example.com
+SECRET_KEY=固定随机长字符串
+DATA_ENCRYPTION_KEY=另一个固定随机长字符串
+SETUP_TOKEN=首次安装令牌
+SIMHUB_DOMAIN=你的域名
 SESSION_COOKIE_SECURE=1
 ENABLE_HSTS=1
 TRUST_PROXY=1
-TZ=Asia/Shanghai
 ```
 
-说明：
+`SECRET_KEY` 和 `DATA_ENCRYPTION_KEY` 必须长期固定；`SETUP_TOKEN` 只用于首次创建管理员，防止公网部署时被抢注。
 
-- `SECRET_KEY` 用于会话签名，必须长期固定。
-- `DATA_ENCRYPTION_KEY` 用于加密 SMTP、Telegram、SM-DP+、激活码、确认码、EID 等敏感字段，丢失后旧数据无法解密。
-- `SETUP_TOKEN` 用于首次创建管理员，公网部署强烈建议设置，避免 `/setup` 被他人抢先注册。
-- `SIMHUB_DOMAIN` 改成你的真实域名，不要带 `https://`。
-
-### 3. 启动生产环境
+启动：
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
@@ -99,21 +93,27 @@ docker compose -f docker-compose.prod.yml up -d --build
 https://你的域名
 ```
 
-首次进入会创建管理员。如果设置了 `SETUP_TOKEN`，页面会要求输入安装令牌。
-
-### 4. 查看状态
+查看日志：
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f app
 docker compose -f docker-compose.prod.yml logs -f reminders
+docker compose -f docker-compose.prod.yml logs -f caddy
 ```
 
-## 本地或内网测试
-
-本地测试可以用普通 Docker Compose，不需要 HTTPS：
+停止：
 
 ```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+### 方式二：本地 / 内网 HTTP 部署
+
+适合本机调试或内网使用，不会自动签发 HTTPS 证书。
+
+```bash
+git clone https://github.com/maow318/simhubweb.git
+cd simhubweb
 cp .env.example .env
 docker compose up -d --build
 ```
@@ -124,11 +124,24 @@ docker compose up -d --build
 http://服务器IP:8080
 ```
 
-本地 HTTP 测试时不要开启：
+本地 HTTP 不要开启：
 
 ```env
 SESSION_COOKIE_SECURE=1
 ENABLE_HSTS=1
+```
+
+查看日志：
+
+```bash
+docker compose logs -f simhub-keeper
+docker compose logs -f simhub-reminders
+```
+
+停止：
+
+```bash
+docker compose down
 ```
 
 ## 升级
@@ -142,6 +155,35 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 升级不会删除 Docker 数据卷。升级前仍建议先备份。
+
+## 忘记密码
+
+如果还能登录后台，可以在「设置 -> 账户安全」里修改密码。
+
+如果管理员密码忘记了，可以在服务器终端执行重置命令。生产 HTTPS 部署使用 `docker-compose.prod.yml`：
+
+```bash
+docker compose -f docker-compose.prod.yml exec app \
+  flask --app app.main reset-password admin
+```
+
+命令会提示输入新密码并二次确认。密码至少 8 位。
+
+如果你使用的是本地 / 内网 `docker-compose.yml`：
+
+```bash
+docker compose exec simhub-keeper \
+  flask --app app.main reset-password admin
+```
+
+也可以非交互式指定新密码：
+
+```bash
+docker compose -f docker-compose.prod.yml exec app \
+  flask --app app.main reset-password admin --password 'new-password-123'
+```
+
+注意：命令行直接带密码可能进入 shell 历史记录，更推荐交互式输入。
 
 ## 备份与恢复
 

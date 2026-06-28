@@ -8,6 +8,8 @@ import unittest
 import urllib.parse
 from unittest import mock
 
+from werkzeug.security import check_password_hash
+
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-simhub-keeper-web-0001")
 os.environ.setdefault("DATA_ENCRYPTION_KEY", "test-data-key-for-simhub-keeper-web-0001")
@@ -412,6 +414,21 @@ class SimhubWebTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         with app.app_context():
             self.assertEqual(get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+
+    def test_reset_password_cli_updates_existing_user(self):
+        runner = app.test_cli_runner()
+        result = runner.invoke(args=["reset-password", "admin", "--password", "newpass123"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn("Password reset for admin", result.output)
+        with app.app_context():
+            row = get_db().execute("SELECT password_hash FROM users WHERE username = ?", ("admin",)).fetchone()
+            self.assertTrue(check_password_hash(row["password_hash"], "newpass123"))
+
+    def test_reset_password_cli_rejects_missing_user(self):
+        runner = app.test_cli_runner()
+        result = runner.invoke(args=["reset-password", "missing", "--password", "newpass123"])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("用户不存在", result.output)
 
     def test_client_ip_uses_forwarded_for_only_when_trusted(self):
         app.config["TRUST_PROXY"] = True

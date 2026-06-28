@@ -21,6 +21,7 @@ from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 from functools import wraps
 
+import click
 from cryptography.fernet import Fernet, InvalidToken
 
 from .countries import (
@@ -1528,6 +1529,29 @@ self.addEventListener('fetch',e=>{
                 **stats
             )
         )
+
+    @app.cli.command("reset-password")
+    @click.argument("username")
+    @click.option("--password", "new_password", help="新密码；不传时会交互式输入。")
+    def reset_password_cmd(username, new_password):
+        """重置用户密码，适合忘记管理员密码时在服务器终端执行。"""
+        init_db()
+        username = (username or "").strip()
+        if not username:
+            raise click.ClickException("用户名不能为空")
+        row = get_db().execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if not row:
+            raise click.ClickException(f"用户不存在：{username}")
+        if new_password is None:
+            new_password = click.prompt("New password", hide_input=True, confirmation_prompt=True)
+        if len(new_password) < 8:
+            raise click.ClickException("密码至少需要 8 位")
+        get_db().execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (hash_password(new_password), row["id"]),
+        )
+        get_db().commit()
+        click.echo(f"Password reset for {username}")
 
     return app
 
