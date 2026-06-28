@@ -576,6 +576,10 @@ const EYEOFF='<svg><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 function safeImgURL(u){try{const x=new URL(String(u||''),location.origin);return x.protocol==='https:'&&(x.hostname==='mzstatic.com'||x.hostname.endsWith('.mzstatic.com'))?x.href:'';}catch(e){return '';}}
+function safeProxyImgURL(u){try{const x=new URL(String(u||''),location.origin);return x.origin===location.origin&&x.pathname==='/api/app-icon'?x.pathname+x.search:'';}catch(e){return '';}}
+function appIconDisplayURL(u){const direct=safeImgURL(u);return direct?(location.protocol==='file:'?direct:'/api/app-icon?url='+encodeURIComponent(direct)):'';}
+function appSearchIconURL(app){return safeProxyImgURL(app&&app.iconProxy)||appIconDisplayURL(app&&app.icon);}
+document.addEventListener('error',e=>{const img=e.target;if(!(img instanceof HTMLImageElement)||!img.classList.contains('appicon'))return;const ph=document.createElement('span');ph.className=img.className;ph.textContent='🌐';const style=img.getAttribute('style');if(style)ph.setAttribute('style',style);img.replaceWith(ph);},true);
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.getElementById('toastHost').appendChild(t);setTimeout(()=>t.remove(),1800);}
 function icon(name){const icons={
   cards:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>',
@@ -1187,7 +1191,7 @@ function cardContentInner(c){
   const rev=revealed.has(c.id)||!maskDefault;
   const phoneTxt=c.phoneNumber?(rev?esc(c.phoneNumber):esc(maskPhone(c.phoneNumber))):'—';
   const eye=c.phoneNumber?`<button class="iconbtn eyebtn">${rev?EYEOFF:EYE}</button>`:'';
-  const appIcon=safeImgURL(c.carrierAppIconURLString);
+  const appIcon=appIconDisplayURL(c.carrierAppIconURLString);
   const iconHtml=appIcon?`<img src="${esc(appIcon)}" class="appicon" style="width:30px;height:30px">`:`<span class="flag">${esc(c.flag||'🌐')}</span>`;
   const s=statusInfo(c);
   return `<div class="cardHead">
@@ -1807,7 +1811,7 @@ function toggleSkipEIDInput(){
   const skip=dG('f_skipEID')&&dG('f_skipEID').checked;
   const el=dG('f_eid');if(el){el.disabled=!!skip;if(skip)el.value='';}
 }
-function refreshAppRow(){const d=drawerData,appIcon=safeImgURL(d.carrierAppIconURLString);dG('appRow').innerHTML=appIcon?`<img src="${esc(appIcon)}" class="appicon"><span>${esc(d.carrierAppName||'已选图标')}</span><span class="chev">›</span>`:`<span class="ph">从 App Store 选择图标</span><span class="chev">›</span>`;}
+function refreshAppRow(){const d=drawerData,appIcon=appIconDisplayURL(d.carrierAppIconURLString);dG('appRow').innerHTML=appIcon?`<img src="${esc(appIcon)}" class="appicon"><span>${esc(d.carrierAppName||'已选图标')}</span><span class="chev">›</span>`:`<span class="ph">从 App Store 选择图标</span><span class="chev">›</span>`;}
 function refreshCountryRow(){const d=drawerData;dG('countryRow').innerHTML=`<span style="font-size:20px">${esc(d.flag||'🌐')}</span><span>${esc(d.countryName||'选择国家 / 地区')}</span><span class="chev">›</span>`;}
 function refreshBgRow(){const d=drawerData;const bg=bgByAsset[d.cardBackgroundAssetName];dG('bgRow').innerHTML=bg?`<img src="${esc(bg)}" class="appicon" style="object-fit:cover"><span>${esc(d.countryName||'已选背景')}</span><span class="chev">›</span>`:`<span class="ph">默认（无背景图）</span><span class="chev">›</span>`;}
 function updateSummary(){const s=dG('f_start').value,e=dG('f_expiry').value;dG('daySummary').textContent=(s&&e)?`开始 ${s} → 到期 ${e}（${daySpan(new Date(s),new Date(e))} 天）`:'';}
@@ -2071,7 +2075,7 @@ async function openAppPicker(){
     <div class="pickerList" id="apList"><p class="sub" style="padding:20px;text-align:center">输入后回车搜索 · 结果来自 Apple iTunes Search API</p></div></div></div>`;
   const run=async()=>{const term=dG('apSearch').value.trim();if(!term)return;dG('apList').innerHTML='<p class="sub" style="padding:20px;text-align:center">搜索中…</p>';
     try{const r=await api('/api/appsearch?term='+encodeURIComponent(term)+'&country='+encodeURIComponent(drawerData.countryCode||'US'))||[];
-      dG('apList').innerHTML=r.length?r.map((a,i)=>{const appIcon=safeImgURL(a.icon);return `<div class="pkItem" data-i="${i}">${appIcon?`<img src="${esc(appIcon)}" class="appicon">`:'<span class="appicon">🌐</span>'}<div><div>${esc(a.name)}</div><div class="sub">${esc(a.seller||'')}</div></div></div>`;}).join(''):'<p class="sub" style="padding:20px;text-align:center">没有找到匹配的 App,换个词或继续用国旗</p>';
+      dG('apList').innerHTML=r.length?r.map((a,i)=>{const appIcon=appSearchIconURL(a);return `<div class="pkItem" data-i="${i}">${appIcon?`<img src="${esc(appIcon)}" class="appicon">`:'<span class="appicon">🌐</span>'}<div><div>${esc(a.name)}</div><div class="sub">${esc(a.seller||'')}</div></div></div>`;}).join(''):'<p class="sub" style="padding:20px;text-align:center">没有找到匹配的 App,换个词或继续用国旗</p>';
       dG('apList').querySelectorAll('.pkItem').forEach(el=>el.onclick=()=>{const a=r[+el.dataset.i];drawerData.carrierAppName=a.name;drawerData.carrierAppIconURLString=a.icon;drawerData.carrierAppStoreURLString=a.url||'';refreshAppRow();host.innerHTML='';});
     }catch(e){dG('apList').innerHTML='<p class="sub" style="padding:20px;text-align:center">'+esc(e.message||'搜索失败')+'</p>';}};
   dG('apSearch').addEventListener('keydown',e=>{if(e.key==='Enter')run();});

@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import os
 import tempfile
 import time
@@ -105,6 +106,43 @@ class SimhubWebTestCase(unittest.TestCase):
         self.assertEqual(result["activationCode"], "MATCHING-ID")
         self.assertEqual(result["confirmationCode"], "CONFIRM")
         self.assertTrue(result["complete"])
+
+    def test_appsearch_returns_same_origin_icon_proxy(self):
+        payload = {
+            "results": [
+                {
+                    "trackName": "Test Carrier",
+                    "artworkUrl512": "https://is1-ssl.mzstatic.com/image/thumb/test.png",
+                    "trackViewUrl": "https://apps.apple.com/app/test/id1",
+                    "sellerName": "Carrier Ltd",
+                }
+            ]
+        }
+        opener = mock.MagicMock()
+        opener.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
+        with mock.patch("app.main.urllib.request.urlopen", return_value=opener):
+            data = self.assert_api_ok(self.client.get("/api/appsearch?term=test&country=US"))
+        self.assertEqual(data[0]["icon"], "https://is1-ssl.mzstatic.com/image/thumb/test.png")
+        self.assertTrue(data[0]["iconProxy"].startswith("/api/app-icon?url="))
+        self.assertIn("mzstatic.com", urllib.parse.unquote(data[0]["iconProxy"]))
+
+    def test_app_icon_proxy_fetches_only_safe_mzstatic_images(self):
+        self.assertEqual(
+            self.client.get("/api/app-icon?url=https://example.com/icon.png").status_code,
+            404,
+        )
+        opener = mock.MagicMock()
+        opener.__enter__.return_value.headers.get_content_type.return_value = "image/png"
+        opener.__enter__.return_value.read.return_value = b"png"
+        with mock.patch("app.main.urllib.request.urlopen", return_value=opener):
+            response = self.client.get(
+                "/api/app-icon?url="
+                + urllib.parse.quote("https://is1-ssl.mzstatic.com/image/thumb/test.png", safe="")
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "image/png")
+        self.assertEqual(response.get_data(), b"png")
+        self.assertIn("max-age=604800", response.headers.get("Cache-Control", ""))
 
     def test_card_crud_and_batch_actions_are_structured(self):
         created = self.assert_api_ok(

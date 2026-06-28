@@ -48,6 +48,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 
 BASE_DIR = os.path.dirname(__file__)
+MAX_APP_ICON_BYTES = 1024 * 1024
 
 
 def env_bool(name, default=False):
@@ -1058,15 +1059,39 @@ self.addEventListener('fetch',e=>{
             return api_fail("App Store 搜索失败，请稍后重试", "APPSEARCH_FAILED", 502)
         results = []
         for item in payload.get("results", []):
+            icon_url = safe_app_icon_url(item.get("artworkUrl512") or item.get("artworkUrl100") or "") or ""
             results.append(
                 {
                     "name": item.get("trackName", ""),
-                    "icon": safe_app_icon_url(item.get("artworkUrl512") or item.get("artworkUrl100") or "") or "",
+                    "icon": icon_url,
+                    "iconProxy": url_for("api_app_icon", url=icon_url) if icon_url else "",
                     "url": safe_optional_http_url(item.get("trackViewUrl", "")) or "",
                     "seller": item.get("sellerName", ""),
                 }
             )
         return api_ok(results)
+
+    @app.route("/api/app-icon")
+    @login_required
+    def api_app_icon():
+        icon_url = safe_app_icon_url(request.args.get("url", ""))
+        if not icon_url:
+            abort(404)
+        try:
+            req = urllib.request.Request(icon_url, headers={"User-Agent": "simhub-keeper-web"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                content_type = resp.headers.get_content_type()
+                if not content_type.startswith("image/"):
+                    abort(404)
+                data = resp.read(MAX_APP_ICON_BYTES + 1)
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            abort(502)
+        if len(data) > MAX_APP_ICON_BYTES:
+            abort(502)
+        response = Response(data, mimetype=content_type)
+        response.headers["Cache-Control"] = "public, max-age=604800, immutable"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @app.route("/api/account")
     @login_required
