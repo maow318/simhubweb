@@ -429,12 +429,18 @@ header{min-height:62px}
 .giffStatus{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.34);padding:11px 12px;font-size:13px;color:var(--sub);margin:12px 0}
 .giffStatus.ok{border-color:rgba(22,163,74,.24);background:rgba(22,163,74,.08);color:var(--ok)}
 .giffStatus.warn{border-color:rgba(217,119,6,.26);background:rgba(217,119,6,.08);color:var(--warn)}
+.giffHint{border:1px solid rgba(37,99,235,.18);background:rgba(59,130,246,.08);border-radius:14px;padding:12px;margin:10px 0 12px;color:var(--text);font-size:13px;line-height:1.55}
+.giffHint b{display:block;margin-bottom:4px}
+.giffHint ol{margin:6px 0 0 18px;padding:0}
+.giffHint li{margin:4px 0}
+.giffHint code{display:inline-block;max-width:100%;white-space:normal;word-break:break-all;background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:8px;padding:2px 5px;color:var(--text)}
 .giffSummary{display:grid;gap:8px;margin-top:10px;font-size:13px}
 .giffSummary div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:7px}
 .giffSummary div:last-child{border-bottom:0;padding-bottom:0}
 .giffSummary b{color:var(--text)}
 .giffDanger{border:1px solid rgba(220,38,38,.22);background:rgba(220,38,38,.07);color:var(--danger);border-radius:14px;padding:11px 12px;font-size:13px;line-height:1.5;margin:10px 0}
 .giffMono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.dark .giffHint code{background:rgba(15,23,42,.45)}
 .dark .seg button.on{background:rgba(255,255,255,.13)}
 .dark .qrBox{background:#f8fafc}
 .dark .previewStat,.dark .fieldChip,.dark .previewBox{background:rgba(255,255,255,.08)}
@@ -855,6 +861,15 @@ function renderGiffgaffTools(){
       <div class="giffSteps">
         <div class="giffStep">
           <h4>1. 登录 giffgaff</h4>
+          <div class="giffHint">
+            <b>登录提示</b>
+            <ol>
+              <li>先用 Google Chrome 打开 giffgaff.com，并登录你的 giffgaff 账号。</li>
+              <li>回到这里点击“生成登录链接”，再点击“打开登录”。</li>
+              <li>在 Chrome 按 F12 打开开发者工具，在 Network 面板里找到以 <code>giffgaff://auth/callback/?code=...&amp;state=...</code> 开头的回调内容。</li>
+              <li>把这条回调 URL 或其中的 code 粘贴到下方输入框，点击“换取令牌”即可登录。</li>
+            </ol>
+          </div>
           <div class="toolActions"><button id="ggStartLogin">生成登录链接</button><button class="sec" id="ggOpenLogin" ${giffState.entryUrl?'':'disabled'}>打开登录</button></div>
           <div class="field" style="margin-top:12px"><label>回调 URL 或 code</label><textarea id="ggCallback" rows="3" placeholder="giffgaff://auth/callback/?code=...&state=..."></textarea></div>
           <div class="toolActions"><button id="ggExchangeToken">换取令牌</button><button class="sec" id="ggClearSession">清空会话</button></div>
