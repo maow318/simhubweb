@@ -778,8 +778,9 @@ def create_app():
                 update_card(card_id, card)
                 log_activity(card_id, "edit", "批量打标签：" + "、".join(tags), label=card.get("carrier") or "未命名")
                 updated += 1
-        get_db().commit()
-        return api_ok({"updated": updated})
+            get_db().commit()
+            return api_ok({"updated": updated})
+        return api_fail("不支持的批量操作", "BAD_ACTION", 400)
 
     @app.route("/api/lpa/parse", methods=["POST"])
     @login_required
@@ -2776,6 +2777,8 @@ def duplicate_reason(dto, existing_cards=None):
     smdp = dto.get("smdpAddress", "").strip()
     cards = existing_cards if existing_cards is not None else load_cards({})
     for card in cards:
+        if dto.get("id") and str(card.get("id") or "").strip() == dto["id"]:
+            return "id"
         if phone and str(card.get("phoneNumber") or "").strip() == phone:
             return "phoneNumber"
         if eid and str(card.get("eid") or "").strip() == eid:
@@ -2823,17 +2826,19 @@ def import_preview(raw_cards, dtos):
     money_count = 0
     icon_count = 0
     existing_cards = load_cards({})
+    comparison_cards = list(existing_cards)
     for dto in dtos:
         reason = ""
         if not dto.get("carrier"):
             reason = "missingCarrier"
             missing_carrier += 1
         else:
-            reason = duplicate_reason(dto, existing_cards)
+            reason = duplicate_reason(dto, comparison_cards)
             if reason:
                 duplicate_counts[reason] = duplicate_counts.get(reason, 0) + 1
         if not reason:
             can_import += 1
+            comparison_cards.append(dto)
         if dto.get("smdpAddress") and dto.get("activationCode"):
             lpa_count += 1
         if dto.get("cyclePaymentMinorUnits") is not None or dto.get("currentBalanceMinorUnits") is not None:

@@ -230,6 +230,12 @@ flask --app app.main run --debug
 python3 -m compileall app
 ```
 
+运行测试（先按上方创建虚拟环境并安装依赖）：
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
 开发约定：
 
 - 后端保持轻量 Flask，不引入重型框架

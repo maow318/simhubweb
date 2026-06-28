@@ -11,7 +11,7 @@
   },
   "flagEmojiAlgorithm": "For a 2-letter UPPERCASE ISO code, map each letter L to the Unicode scalar (0x1F1E6 + (L - 'A')) and concatenate the two regional-indicator symbols. If no valid 2-letter code, fall back to the globe emoji.",
   "totalCountries": 252,
-  "countriesWithCardBackground": 166,
+  "countriesWithCardBackground": 198,
   "countries": [
     {
       "countryCode": "AC",
@@ -19,7 +19,7 @@
       "callingCodes": [],
       "englishName": "Ascension Island",
       "cardBackgroundAssetName": "CardBackgroundAscensionIslandLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundAscensionIslandLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundAscensionIslandLighttrail.jpg"
     },
     {
       "countryCode": "AD",
@@ -36,7 +36,10 @@
       "flag": "🇦🇪",
       "callingCodes": [
         "+971"
-      ]
+      ],
+      "englishName": "United Arab Emirates",
+      "cardBackgroundAssetName": "CardBackgroundUnitedArabEmiratesLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundUnitedArabEmiratesLighttrail.jpg"
     },
     {
       "countryCode": "AF",
@@ -124,7 +127,7 @@
       ],
       "englishName": "American Samoa",
       "cardBackgroundAssetName": "CardBackgroundAmericanSamoaLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundAmericanSamoaLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundAmericanSamoaLighttrail.jpg"
     },
     {
       "countryCode": "AT",
@@ -214,7 +217,7 @@
       ],
       "englishName": "Belgium",
       "cardBackgroundAssetName": "CardBackgroundBelgiumLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundBelgiumLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundBelgiumLighttrail.jpg"
     },
     {
       "countryCode": "BF",
@@ -224,7 +227,7 @@
       ],
       "englishName": "Burkina Faso",
       "cardBackgroundAssetName": "CardBackgroundBurkinaFasoLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundBurkinaFasoLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundBurkinaFasoLighttrail.jpg"
     },
     {
       "countryCode": "BG",
@@ -234,7 +237,7 @@
       ],
       "englishName": "Bulgaria",
       "cardBackgroundAssetName": "CardBackgroundBulgariaLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundBulgariaLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundBulgariaLighttrail.jpg"
     },
     {
       "countryCode": "BH",
@@ -254,7 +257,7 @@
       ],
       "englishName": "Burundi",
       "cardBackgroundAssetName": "CardBackgroundBurundiLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundBurundiLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundBurundiLighttrail.jpg"
     },
     {
       "countryCode": "BJ",
@@ -291,7 +294,7 @@
       ],
       "englishName": "Brunei",
       "cardBackgroundAssetName": "CardBackgroundBruneiLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundBruneiLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundBruneiLighttrail.jpg"
     },
     {
       "countryCode": "BO",
@@ -379,7 +382,7 @@
       ],
       "englishName": "Belize",
       "cardBackgroundAssetName": "CardBackgroundBelizeLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundBelizeLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundBelizeLighttrail.jpg"
     },
     {
       "countryCode": "CA",
@@ -389,7 +392,7 @@
       ],
       "englishName": "Canada",
       "cardBackgroundAssetName": "CardBackgroundCanadaLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundCanadaLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundCanadaLighttrail.jpg"
     },
     {
       "countryCode": "CC",
@@ -479,7 +482,7 @@
       ],
       "englishName": "Cameroon",
       "cardBackgroundAssetName": "CardBackgroundCameroonLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundCameroonLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundCameroonLighttrail.jpg"
     },
     {
       "countryCode": "CN",
@@ -707,7 +710,10 @@
       "flag": "🇪🇸",
       "callingCodes": [
         "+34"
-      ]
+      ],
+      "englishName": "Spain",
+      "cardBackgroundAssetName": "CardBackgroundSpainLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSpainLighttrail.jpg"
     },
     {
       "countryCode": "ET",
@@ -1193,7 +1199,7 @@
       ],
       "englishName": "Cambodia",
       "cardBackgroundAssetName": "CardBackgroundCambodiaLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundCambodiaLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundCambodiaLighttrail.jpg"
     },
     {
       "countryCode": "KI",
@@ -1234,7 +1240,10 @@
       "flag": "🇰🇷",
       "callingCodes": [
         "+82"
-      ]
+      ],
+      "englishName": "South Korea",
+      "cardBackgroundAssetName": "CardBackgroundSouthKoreaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSouthKoreaLighttrail.jpg"
     },
     {
       "countryCode": "KW",
@@ -1308,7 +1317,10 @@
       "flag": "🇱🇰",
       "callingCodes": [
         "+94"
-      ]
+      ],
+      "englishName": "Sri Lanka",
+      "cardBackgroundAssetName": "CardBackgroundSriLankaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSriLankaLighttrail.jpg"
     },
     {
       "countryCode": "LR",
@@ -1627,7 +1639,10 @@
       "flag": "🇳🇬",
       "callingCodes": [
         "+234"
-      ]
+      ],
+      "englishName": "Nigeria",
+      "cardBackgroundAssetName": "CardBackgroundNigeriaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundNigeriaLighttrail.jpg"
     },
     {
       "countryCode": "NI",
@@ -1651,14 +1666,20 @@
       "flag": "🇳🇴",
       "callingCodes": [
         "+47"
-      ]
+      ],
+      "englishName": "Norway",
+      "cardBackgroundAssetName": "CardBackgroundNorwayLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundNorwayLighttrail.jpg"
     },
     {
       "countryCode": "NP",
       "flag": "🇳🇵",
       "callingCodes": [
         "+977"
-      ]
+      ],
+      "englishName": "Nepal",
+      "cardBackgroundAssetName": "CardBackgroundNepalLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundNepalLighttrail.jpg"
     },
     {
       "countryCode": "NR",
@@ -1689,21 +1710,30 @@
       "flag": "🇴🇲",
       "callingCodes": [
         "+968"
-      ]
+      ],
+      "englishName": "Oman",
+      "cardBackgroundAssetName": "CardBackgroundOmanLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundOmanLighttrail.jpg"
     },
     {
       "countryCode": "PA",
       "flag": "🇵🇦",
       "callingCodes": [
         "+507"
-      ]
+      ],
+      "englishName": "Panama",
+      "cardBackgroundAssetName": "CardBackgroundPanamaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundPanamaLighttrail.jpg"
     },
     {
       "countryCode": "PE",
       "flag": "🇵🇪",
       "callingCodes": [
         "+51"
-      ]
+      ],
+      "englishName": "Peru",
+      "cardBackgroundAssetName": "CardBackgroundPeruLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundPeruLighttrail.jpg"
     },
     {
       "countryCode": "PF",
@@ -1727,21 +1757,30 @@
       "flag": "🇵🇭",
       "callingCodes": [
         "+63"
-      ]
+      ],
+      "englishName": "Philippines",
+      "cardBackgroundAssetName": "CardBackgroundPhilippinesLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundPhilippinesLighttrail.jpg"
     },
     {
       "countryCode": "PK",
       "flag": "🇵🇰",
       "callingCodes": [
         "+92"
-      ]
+      ],
+      "englishName": "Pakistan",
+      "cardBackgroundAssetName": "CardBackgroundPakistanLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundPakistanLighttrail.jpg"
     },
     {
       "countryCode": "PL",
       "flag": "🇵🇱",
       "callingCodes": [
         "+48"
-      ]
+      ],
+      "englishName": "Poland",
+      "cardBackgroundAssetName": "CardBackgroundPolandLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundPolandLighttrail.jpg"
     },
     {
       "countryCode": "PM",
@@ -1769,7 +1808,10 @@
       "flag": "🇵🇹",
       "callingCodes": [
         "+351"
-      ]
+      ],
+      "englishName": "Portugal",
+      "cardBackgroundAssetName": "CardBackgroundPortugalLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundPortugalLighttrail.jpg"
     },
     {
       "countryCode": "PW",
@@ -1790,7 +1832,10 @@
       "flag": "🇶🇦",
       "callingCodes": [
         "+974"
-      ]
+      ],
+      "englishName": "Qatar",
+      "cardBackgroundAssetName": "CardBackgroundQatarLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundQatarLighttrail.jpg"
     },
     {
       "countryCode": "RE",
@@ -1804,21 +1849,30 @@
       "flag": "🇷🇴",
       "callingCodes": [
         "+40"
-      ]
+      ],
+      "englishName": "Romania",
+      "cardBackgroundAssetName": "CardBackgroundRomaniaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundRomaniaLighttrail.jpg"
     },
     {
       "countryCode": "RS",
       "flag": "🇷🇸",
       "callingCodes": [
         "+381"
-      ]
+      ],
+      "englishName": "Serbia",
+      "cardBackgroundAssetName": "CardBackgroundSerbiaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSerbiaLighttrail.jpg"
     },
     {
       "countryCode": "RU",
       "flag": "🇷🇺",
       "callingCodes": [
         "+7"
-      ]
+      ],
+      "englishName": "Russia",
+      "cardBackgroundAssetName": "CardBackgroundRussiaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundRussiaLighttrail.jpg"
     },
     {
       "countryCode": "RW",
@@ -1832,7 +1886,10 @@
       "flag": "🇸🇦",
       "callingCodes": [
         "+966"
-      ]
+      ],
+      "englishName": "Saudi Arabia",
+      "cardBackgroundAssetName": "CardBackgroundSaudiArabiaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSaudiArabiaLighttrail.jpg"
     },
     {
       "countryCode": "SB",
@@ -1860,14 +1917,20 @@
       "flag": "🇸🇪",
       "callingCodes": [
         "+46"
-      ]
+      ],
+      "englishName": "Sweden",
+      "cardBackgroundAssetName": "CardBackgroundSwedenLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSwedenLighttrail.jpg"
     },
     {
       "countryCode": "SG",
       "flag": "🇸🇬",
       "callingCodes": [
         "+65"
-      ]
+      ],
+      "englishName": "Singapore",
+      "cardBackgroundAssetName": "CardBackgroundSingaporeLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSingaporeLighttrail.jpg"
     },
     {
       "countryCode": "SH",
@@ -1881,7 +1944,10 @@
       "flag": "🇸🇮",
       "callingCodes": [
         "+386"
-      ]
+      ],
+      "englishName": "Slovenia",
+      "cardBackgroundAssetName": "CardBackgroundSloveniaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSloveniaLighttrail.jpg"
     },
     {
       "countryCode": "SJ",
@@ -1895,7 +1961,10 @@
       "flag": "🇸🇰",
       "callingCodes": [
         "+421"
-      ]
+      ],
+      "englishName": "Slovakia",
+      "cardBackgroundAssetName": "CardBackgroundSlovakiaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSlovakiaLighttrail.jpg"
     },
     {
       "countryCode": "SL",
@@ -2069,7 +2138,10 @@
       "flag": "🇹🇷",
       "callingCodes": [
         "+90"
-      ]
+      ],
+      "englishName": "Turkey",
+      "cardBackgroundAssetName": "CardBackgroundTurkeyLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundTurkeyLighttrail.jpg"
     },
     {
       "countryCode": "TT",
@@ -2107,14 +2179,20 @@
       "flag": "🇺🇦",
       "callingCodes": [
         "+380"
-      ]
+      ],
+      "englishName": "Ukraine",
+      "cardBackgroundAssetName": "CardBackgroundUkraineLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundUkraineLighttrail.jpg"
     },
     {
       "countryCode": "UG",
       "flag": "🇺🇬",
       "callingCodes": [
         "+256"
-      ]
+      ],
+      "englishName": "Uganda",
+      "cardBackgroundAssetName": "CardBackgroundUgandaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundUgandaLighttrail.jpg"
     },
     {
       "countryCode": "US",
@@ -2131,14 +2209,20 @@
       "flag": "🇺🇾",
       "callingCodes": [
         "+598"
-      ]
+      ],
+      "englishName": "Uruguay",
+      "cardBackgroundAssetName": "CardBackgroundUruguayLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundUruguayLighttrail.jpg"
     },
     {
       "countryCode": "UZ",
       "flag": "🇺🇿",
       "callingCodes": [
         "+998"
-      ]
+      ],
+      "englishName": "Uzbekistan",
+      "cardBackgroundAssetName": "CardBackgroundUzbekistanLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundUzbekistanLighttrail.jpg"
     },
     {
       "countryCode": "VA",
@@ -2159,7 +2243,10 @@
       "flag": "🇻🇪",
       "callingCodes": [
         "+58"
-      ]
+      ],
+      "englishName": "Venezuela",
+      "cardBackgroundAssetName": "CardBackgroundVenezuelaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundVenezuelaLighttrail.jpg"
     },
     {
       "countryCode": "VG",
@@ -2169,7 +2256,7 @@
       ],
       "englishName": "British Virgin Islands",
       "cardBackgroundAssetName": "CardBackgroundBritishVirginIslandsLighttrail",
-      "cardBackgroundFile": "flags/CardBackgroundBritishVirginIslandsLighttrail.png"
+      "cardBackgroundFile": "flags/CardBackgroundBritishVirginIslandsLighttrail.jpg"
     },
     {
       "countryCode": "VI",
@@ -2239,21 +2326,30 @@
       "flag": "🇿🇦",
       "callingCodes": [
         "+27"
-      ]
+      ],
+      "englishName": "South Africa",
+      "cardBackgroundAssetName": "CardBackgroundSouthAfricaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundSouthAfricaLighttrail.jpg"
     },
     {
       "countryCode": "ZM",
       "flag": "🇿🇲",
       "callingCodes": [
         "+260"
-      ]
+      ],
+      "englishName": "Zambia",
+      "cardBackgroundAssetName": "CardBackgroundZambiaLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundZambiaLighttrail.jpg"
     },
     {
       "countryCode": "ZW",
       "flag": "🇿🇼",
       "callingCodes": [
         "+263"
-      ]
+      ],
+      "englishName": "Zimbabwe",
+      "cardBackgroundAssetName": "CardBackgroundZimbabweLighttrail",
+      "cardBackgroundFile": "flags/CardBackgroundZimbabweLighttrail.jpg"
     }
   ]
 }
